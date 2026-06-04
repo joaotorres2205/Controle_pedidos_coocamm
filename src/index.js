@@ -8,11 +8,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-  console.error('❌ SUPABASE_URL e SUPABASE_SERVICE_KEY devem estar no arquivo .env');
-  process.exit(1);
+  console.error('❌ SUPABASE_URL e SUPABASE_SERVICE_KEY não configuradas');
+  // Não usar process.exit() em serverless — apenas loga o erro
 }
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_KEY || ''
+);
 
 app.use(cors());
 app.use(express.json());
