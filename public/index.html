@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COOCAMM — Controle de Notas 2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+:root{
+  --green:#1a5c38;--green-d:#0f3d25;--green-l:#2d8653;--green-xl:#e8f5ee;
+  --brown:#6B4423;--brown-l:#c4992e;
+  --bg:#f0f4ec;--card:#fff;--border:#cdddc8;
+  --text:#1e2d1f;--muted:#5a7060;
+  --red:#c0392b;--yellow:#e6a817;--blue:#2471a3;
+  --sh:0 2px 12px rgba(26,92,56,.10);
+  --r:10px;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;border:none;font-family:inherit}
+input,select,textarea{font-family:inherit;font-size:.9rem}
+
+/* ─── LOGIN ─────────────────────────────────────────────────────────── */
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,var(--green-d) 0%,var(--green) 60%,var(--green-l) 100%)}
+.login-box{background:var(--card);border-radius:16px;padding:2.5rem;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.25);text-align:center}
+.login-box svg{display:block;margin:0 auto 1.2rem}
+.login-box h2{font-size:1.1rem;color:var(--muted);margin-bottom:1.8rem;font-weight:400}
+.login-box .inp-grp{text-align:left;margin-bottom:1rem}
+.login-box label{display:block;font-size:.78rem;font-weight:600;color:var(--green);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.5px}
+.login-box input{width:100%;padding:.7rem .9rem;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;transition:border .2s}
+.login-box input:focus{outline:none;border-color:var(--green)}
+.login-box .btn-login{width:100%;padding:.8rem;background:var(--green);color:#fff;border-radius:8px;font-size:1rem;font-weight:600;margin-top:.8rem;transition:background .2s}
+.login-box .btn-login:hover{background:var(--green-d)}
+.login-err{color:var(--red);font-size:.85rem;margin-top:.6rem;min-height:1.2rem}
+
+/* ─── APP LAYOUT ─────────────────────────────────────────────────────── */
+#app{display:flex;min-height:100vh}
+
+/* Sidebar */
+#sidebar{width:230px;min-height:100vh;background:var(--green-d);color:#fff;display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;transition:transform .25s}
+#sidebar .logo-wrap{padding:1.2rem 1rem 1rem;border-bottom:1px solid rgba(255,255,255,.1)}
+#sidebar .logo-wrap svg{display:block;margin:0 auto}
+#sidebar nav{flex:1;padding:.8rem 0}
+#sidebar nav a{display:flex;align-items:center;gap:.7rem;padding:.7rem 1.2rem;color:rgba(255,255,255,.8);font-size:.9rem;transition:all .15s;border-left:3px solid transparent}
+#sidebar nav a:hover{background:rgba(255,255,255,.08);color:#fff}
+#sidebar nav a.active{background:rgba(255,255,255,.12);color:#fff;border-left-color:var(--brown-l)}
+#sidebar nav a svg{flex-shrink:0;opacity:.8}
+#sidebar .sidebar-sub{font-size:.7rem;color:rgba(255,255,255,.4);padding:.6rem 1.2rem .2rem;text-transform:uppercase;letter-spacing:1px}
+#sidebar .user-box{padding:1rem;border-top:1px solid rgba(255,255,255,.1);font-size:.8rem;color:rgba(255,255,255,.7)}
+#sidebar .user-box .email{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;margin-bottom:.5rem}
+#sidebar .btn-logout{width:100%;background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);padding:.45rem;border-radius:6px;font-size:.8rem;transition:background .15s}
+#sidebar .btn-logout:hover{background:rgba(255,255,255,.15)}
+
+/* Main */
+#main{margin-left:230px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+#topbar{background:var(--card);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;gap:1rem;position:sticky;top:0;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+#topbar h1{font-size:1.05rem;font-weight:600;color:var(--green-d);flex:1}
+#topbar .user-badge{font-size:.78rem;color:var(--muted);background:var(--green-xl);padding:.25rem .7rem;border-radius:20px}
+#content{flex:1;padding:1.5rem}
+footer{text-align:center;padding:.7rem;font-size:.75rem;color:var(--muted);border-top:1px solid var(--border);background:var(--card)}
+
+/* Hamburger (mobile) */
+#menu-btn{display:none;background:none;padding:.3rem;border-radius:6px}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:90}
+
+/* ─── COMMON COMPONENTS ──────────────────────────────────────────────── */
+.section-header{display:flex;align-items:center;gap:.8rem;margin-bottom:1.2rem;flex-wrap:wrap}
+.section-header h2{font-size:1.2rem;font-weight:700;color:var(--green-d);flex:1}
+.section-header .actions{display:flex;gap:.5rem;flex-wrap:wrap}
+
+.btn{padding:.5rem 1rem;border-radius:7px;font-size:.85rem;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--green-d)}
+.btn-secondary{background:var(--green-xl);color:var(--green)}.btn-secondary:hover{background:#d4ecdb}
+.btn-danger{background:#fdecea;color:var(--red)}.btn-danger:hover{background:#f5c6c3}
+.btn-sm{padding:.35rem .7rem;font-size:.78rem}
+.btn-outline{background:none;border:1.5px solid var(--border);color:var(--muted)}.btn-outline:hover{border-color:var(--green);color:var(--green)}
+
+.card{background:var(--card);border-radius:var(--r);padding:1.2rem;box-shadow:var(--sh)}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
+.filter-bar select,.filter-bar input{padding:.45rem .75rem;border:1.5px solid var(--border);border-radius:7px;background:#fff;color:var(--text);font-size:.85rem}
+.filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--green)}
+
+/* Tables */
+.tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--sh)}
+table{width:100%;border-collapse:collapse;background:var(--card)}
+thead th{background:var(--green);color:#fff;padding:.6rem .9rem;text-align:left;font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:hover{background:#f7fbf5}
+tbody td{padding:.6rem .9rem;font-size:.85rem;vertical-align:middle}
+.tbl-empty{text-align:center;padding:2rem;color:var(--muted);font-size:.9rem}
+
+/* Status badges */
+.badge{display:inline-block;padding:.2rem .55rem;border-radius:20px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.badge-open{background:#e8f5ee;color:var(--green-l)}
+.badge-almost{background:#fef9e7;color:var(--yellow)}
+.badge-closed{background:#f0f0f0;color:#888}
+.badge-fob{background:#e8f0fe;color:var(--blue)}
+.badge-cif{background:#fdf0e8;color:var(--brown)}
+
+/* Progress bar */
+.prog{background:#e0e0e0;border-radius:20px;height:8px;overflow:hidden;min-width:80px}
+.prog-fill{height:100%;border-radius:20px;background:var(--green-l);transition:width .4s}
+.prog-fill.warn{background:var(--yellow)}
+.prog-fill.done{background:#27ae60}
+.prog-fill.over{background:var(--blue)}
+
+/* Stat cards */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--card);border-radius:var(--r);padding:1.2rem;box-shadow:var(--sh);border-left:4px solid var(--green)}
+.stat-card.yellow{border-left-color:var(--yellow)}
+.stat-card.brown{border-left-color:var(--brown)}
+.stat-card.blue{border-left-color:var(--blue)}
+.stat-card .label{font-size:.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.4rem}
+.stat-card .value{font-size:1.8rem;font-weight:700;color:var(--green-d);line-height:1}
+.stat-card.yellow .value{color:var(--brown)}
+.stat-card.blue .value{color:var(--blue)}
+.stat-card .sub{font-size:.72rem;color:var(--muted);margin-top:.3rem}
+
+/* Dashboard 2-col */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem}
+@media(max-width:900px){.dash-grid{grid-template-columns:1fr}}
+.dash-grid .card h3{font-size:.85rem;font-weight:600;color:var(--green-d);margin-bottom:.8rem;text-transform:uppercase;letter-spacing:.5px}
+
+/* ─── MODALS ─────────────────────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-box{background:var(--card);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25)}
+.modal-head{padding:1.2rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1}
+.modal-head h3{font-size:1rem;font-weight:700;color:var(--green-d)}
+.modal-head button{background:none;font-size:1.3rem;color:var(--muted);line-height:1;padding:.2rem .4rem;border-radius:4px}
+.modal-head button:hover{background:var(--bg);color:var(--text)}
+.modal-body{padding:1.5rem}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+@media(max-width:480px){.form-row{grid-template-columns:1fr}}
+.field{margin-bottom:.9rem}
+.field label{display:block;font-size:.78rem;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+.field input,.field select,.field textarea{width:100%;padding:.6rem .8rem;border:1.5px solid var(--border);border-radius:7px;font-size:.9rem;transition:border .2s;background:#fff}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green)}
+.field .hint{font-size:.72rem;color:var(--muted);margin-top:.2rem}
+.modal-foot{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:var(--card)}
+
+/* ─── TOAST ──────────────────────────────────────────────────────────── */
+#toast-wrap{position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;display:flex;flex-direction:column;gap:.5rem}
+.toast{padding:.7rem 1.1rem;border-radius:8px;font-size:.85rem;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.18);animation:slideIn .25s ease;display:flex;align-items:center;gap:.5rem;max-width:320px}
+.toast.ok{background:#1e7e44;color:#fff}
+.toast.err{background:var(--red);color:#fff}
+.toast.warn{background:#e67e22;color:#fff}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+
+/* ─── CONFIRM DIALOG ────────────────────────────────────────────────── */
+#confirm-modal .modal-box{max-width:360px}
+#confirm-modal .modal-body p{color:var(--muted);font-size:.9rem;line-height:1.5}
+
+/* ─── RELATÓRIOS ────────────────────────────────────────────────────── */
+.rel-filter-card{background:var(--card);border-radius:var(--r);padding:1rem 1.2rem;box-shadow:var(--sh);margin-bottom:1rem}
+.rel-filter-card h4{font-size:.78rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.7rem}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;align-items:end}
+.filter-grid .field{margin-bottom:0}
+.rel-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem;margin-bottom:1rem}
+.rel-stat{background:var(--card);border-radius:var(--r);padding:1rem;box-shadow:var(--sh);border-top:3px solid var(--green)}
+.rel-stat.y{border-top-color:var(--yellow)}.rel-stat.b{border-top-color:var(--blue)}.rel-stat.br{border-top-color:var(--brown)}
+.rel-stat .rl{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem}
+.rel-stat .rv{font-size:1.4rem;font-weight:700;color:var(--green-d);line-height:1}
+.rel-stat.y .rv{color:var(--brown)}.rel-stat.b .rv{color:var(--blue)}
+/* Histórico badges */
+.acao-badge{display:inline-block;padding:.15rem .5rem;border-radius:20px;font-size:.72rem;font-weight:700}
+.acao-CRIOU{background:#e8f5ee;color:var(--green-l)}
+.acao-EDITOU{background:#fef9e7;color:var(--yellow)}
+.acao-EXCLUIU{background:#fdecea;color:var(--red)}
+/* ─── CADASTROS TABS ────────────────────────────────────────────────── */
+.tabs{display:flex;gap:.3rem;border-bottom:2px solid var(--border);margin-bottom:1.2rem}
+.tab{padding:.55rem 1rem;border-radius:7px 7px 0 0;font-size:.85rem;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;transition:all .15s}
+.tab.active{color:var(--green);background:var(--green-xl);border-bottom:2px solid var(--green)}
+.tab:hover:not(.active){background:var(--bg);color:var(--green)}
+
+/* ─── MOBILE ─────────────────────────────────────────────────────────── */
+@media(max-width:700px){
+  #sidebar{transform:translateX(-100%)}
+  #sidebar.open{transform:none}
+  #main{margin-left:0}
+  #menu-btn{display:block}
+  .overlay.show{display:block}
+  .stat-grid{grid-template-columns:1fr 1fr}
+  #content{padding:1rem}
+  .section-header{gap:.5rem}
+}
+@media(max-width:480px){
+  .stat-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════ LOGIN ══════════════════════ -->
+<div id="login-screen">
+<div class="login-box">
+  <!-- COOCAMM Logo SVG -->
+  <svg width="160" height="68" viewBox="0 0 160 68" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="36,4 24,26 48,26" fill="#2d8653"/>
+    <polygon points="36,14 19,38 53,38" fill="#1a5c38"/>
+    <rect x="32" y="38" width="8" height="7" rx="1" fill="#1a5c38"/>
+    <polygon points="58,4 46,26 70,26" fill="#2d8653"/>
+    <polygon points="58,14 41,38 75,38" fill="#1a5c38"/>
+    <rect x="54" y="38" width="8" height="7" rx="1" fill="#1a5c38"/>
+    <path d="M6 47 Q44 61 92 47 Q122 37 150 47" stroke="#2d8653" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <text x="2" y="66" font-family="Georgia,serif" font-weight="bold" font-size="15" fill="#6B4423" letter-spacing="3.5">COOCAMM</text>
+  </svg>
+  <h2>COOCAMM — Controle de Notas 2026</h2>
+  <div class="inp-grp">
+    <label>E-mail</label>
+    <input id="l-email" type="email" placeholder="seu@email.com" autocomplete="username">
+  </div>
+  <div class="inp-grp">
+    <label>Senha</label>
+    <input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button class="btn-login" id="btn-login">Entrar</button>
+  <div class="login-err" id="login-err"></div>
+</div>
+</div>
+
+<!-- ══════════════════════ APP ══════════════════════ -->
+<div id="app" hidden>
+<div class="overlay" id="overlay"></div>
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="logo-wrap">
+    <svg width="140" height="58" viewBox="0 0 160 68" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="36,4 24,26 48,26" fill="#4db87a"/>
+      <polygon points="36,14 19,38 53,38" fill="#2d8653"/>
+      <rect x="32" y="38" width="8" height="7" rx="1" fill="#2d8653"/>
+      <polygon points="58,4 46,26 70,26" fill="#4db87a"/>
+      <polygon points="58,14 41,38 75,38" fill="#2d8653"/>
+      <rect x="54" y="38" width="8" height="7" rx="1" fill="#2d8653"/>
+      <path d="M6 47 Q44 61 92 47 Q122 37 150 47" stroke="#4db87a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <text x="2" y="66" font-family="Georgia,serif" font-weight="bold" font-size="15" fill="#e8c98a" letter-spacing="3.5">COOCAMM</text>
+    </svg>
+  </div>
+  <nav>
+    <a href="#" data-sec="dashboard" class="active">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      Dashboard
+    </a>
+    <a href="#" data-sec="carregamentos">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+      Carregamentos
+    </a>
+    <a href="#" data-sec="notas">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/></svg>
+      Notas SF
+    </a>
+    <a href="#" data-sec="pedidos">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+      Pedidos
+    </a>
+    <div class="sidebar-sub">Análise</div>
+    <a href="#" data-sec="relatorios">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4zm2.5 2.1h-15V5h15v14.1zm0-16.1h-15c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+      Relatórios
+    </a>
+    <a href="#" data-sec="historico">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+      Histórico
+    </a>
+    <div class="sidebar-sub">Cadastros</div>
+    <a href="#" data-sec="cadastros">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+      Cadastros
+    </a>
+  </nav>
+  <div class="user-box">
+    <div class="email" id="user-email">—</div>
+    <button class="btn-logout" id="btn-logout">Sair</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<div id="main">
+  <header id="topbar">
+    <button id="menu-btn" onclick="toggleSidebar()">
+      <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+    </button>
+    <h1 id="page-title">Dashboard</h1>
+    <span class="user-badge" id="user-badge">—</span>
+  </header>
+
+  <div id="content">
+
+    <!-- ── DASHBOARD ─────────────────────────────────────────────── -->
+    <section id="sec-dashboard">
+      <div class="section-header">
+        <h2>Dashboard</h2>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">↻ Atualizar</button>
+        </div>
+      </div>
+      <div class="stat-grid" id="dash-stats"></div>
+      <div class="dash-grid">
+        <div class="card">
+          <h3>Progresso por Produto</h3>
+          <canvas id="chart-produto" height="180"></canvas>
+        </div>
+        <div class="card">
+          <h3>Pedidos em Aberto</h3>
+          <div id="dash-pedidos" style="max-height:220px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:.8rem">Últimas Notas SF Lançadas</h3>
+        <div class="tbl-wrap">
+          <table id="dash-notas-tbl">
+            <thead><tr><th>Nota SF</th><th>Data</th><th>Produto</th><th>Cliente</th><th>Qtde (t)</th><th>Valor (R$)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CARREGAMENTOS ─────────────────────────────────────────── -->
+    <section id="sec-carregamentos" hidden>
+      <div class="section-header">
+        <h2>Carregamentos — NF de Remessa</h2>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="exportCSV('carregamentos')">↓ CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="openCarrModal()">+ Novo</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <select id="f-carr-prod" onchange="loadCarregamentos()">
+          <option value="">Todos os produtos</option>
+        </select>
+        <select id="f-carr-modal" onchange="loadCarregamentos()">
+          <option value="">FOB e CIF</option>
+          <option value="FOB">FOB</option>
+          <option value="CIF">CIF</option>
+        </select>
+        <select id="f-carr-forn" onchange="loadCarregamentos()">
+          <option value="">Todos os fornecedores</option>
+        </select>
+      </div>
+      <div class="tbl-wrap">
+        <table id="carr-tbl">
+          <thead>
+            <tr>
+              <th>Nota NF</th><th>Data</th><th>Produto</th><th>Fornecedor</th>
+              <th>Modal</th><th>Entrada (t)</th><th>Faturado (t)</th>
+              <th>Saldo (t)</th><th>Custo R$/t</th><th>Status</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── NOTAS SF ──────────────────────────────────────────────── -->
+    <section id="sec-notas" hidden>
+      <div class="section-header">
+        <h2>Notas de Simples Faturamento</h2>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="exportCSV('notas')">↓ CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="openNotaModal()">+ Nova SF</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <select id="f-nota-prod" onchange="loadNotas()">
+          <option value="">Todos os produtos</option>
+        </select>
+        <input id="f-nota-cli" placeholder="Buscar cliente..." oninput="loadNotas()" style="min-width:160px">
+      </div>
+      <div class="tbl-wrap">
+        <table id="nota-tbl">
+          <thead>
+            <tr>
+              <th>Nota SF</th><th>Data</th><th>Produto</th><th>Cliente</th>
+              <th>Qtde (t)</th><th>Valor (R$)</th><th>Carregamento</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── PEDIDOS ───────────────────────────────────────────────── -->
+    <section id="sec-pedidos" hidden>
+      <div class="section-header">
+        <h2>Pedidos</h2>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm" onclick="openPedidoModal()">+ Novo Pedido</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table id="pedido-tbl">
+          <thead>
+            <tr>
+              <th>Cliente</th><th>Produto</th><th>Pedido (t)</th>
+              <th>Entregue (t)</th><th>Saldo (t)</th><th>Progresso</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── RELATÓRIOS ────────────────────────────────────────────── -->
+    <section id="sec-relatorios" hidden>
+      <div class="section-header">
+        <h2>Relatórios</h2>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="exportRelatorio()">↓ Exportar CSV</button>
+          <button class="btn btn-primary btn-sm" onclick="gerarRelatorio()">🔍 Gerar Relatório</button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="rel-filter-card">
+        <h4>Filtros</h4>
+        <div class="filter-grid">
+          <div class="field"><label>Data inicial</label><input type="date" id="r-data-ini"></div>
+          <div class="field"><label>Data final</label><input type="date" id="r-data-fim"></div>
+          <div class="field"><label>Produto</label>
+            <select id="r-produto"><option value="">Todos</option></select>
+          </div>
+          <div class="field"><label>Fornecedor</label>
+            <select id="r-fornecedor"><option value="">Todos</option></select>
+          </div>
+          <div class="field"><label>Modal</label>
+            <select id="r-modal"><option value="">FOB e CIF</option><option value="FOB">FOB</option><option value="CIF">CIF</option></select>
+          </div>
+          <div class="field"><label>Cliente</label>
+            <select id="r-cliente"><option value="">Todos</option></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="rel-stats" id="rel-stats">
+        <div class="rel-stat"><div class="rl">Total Carregado</div><div class="rv">—</div></div>
+        <div class="rel-stat y"><div class="rl">Total Faturado</div><div class="rv">—</div></div>
+        <div class="rel-stat b"><div class="rl">Valor Faturado</div><div class="rv">—</div></div>
+        <div class="rel-stat br"><div class="rl">Saldo a Faturar</div><div class="rv">—</div></div>
+        <div class="rel-stat"><div class="rl">Notas SF</div><div class="rv">—</div></div>
+        <div class="rel-stat y"><div class="rl">R$/t Médio</div><div class="rv">—</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs" id="rel-tabs">
+        <button class="tab active" onclick="switchRelTab('resumo')">📊 Por Produto</button>
+        <button class="tab" onclick="switchRelTab('clientes')">👤 Por Cliente</button>
+        <button class="tab" onclick="switchRelTab('mensal')">📅 Evolução Mensal</button>
+        <button class="tab" onclick="switchRelTab('carregamentos')">🚚 Carregamentos</button>
+        <button class="tab" onclick="switchRelTab('notas')">📄 Notas SF</button>
+      </div>
+
+      <!-- Tab: Por Produto -->
+      <div id="rel-tab-resumo">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+          <div class="card"><canvas id="rel-chart-prod" height="200"></canvas></div>
+          <div class="card"><canvas id="rel-chart-valor" height="200"></canvas></div>
+        </div>
+        <div class="tbl-wrap">
+          <table id="rel-prod-tbl">
+            <thead><tr><th>Produto</th><th>Carregado (t)</th><th>Faturado (t)</th><th>Saldo (t)</th><th>% Faturado</th><th>Valor Total (R$)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Por Cliente -->
+      <div id="rel-tab-clientes" hidden>
+        <div class="tbl-wrap">
+          <table id="rel-cli-tbl">
+            <thead><tr><th>Cliente</th><th>Qtde Faturada (t)</th><th>Valor Total (R$)</th><th>Notas</th><th>R$/t Médio</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Evolução Mensal -->
+      <div id="rel-tab-mensal" hidden>
+        <div class="card" style="margin-bottom:1rem"><canvas id="rel-chart-mensal" height="180"></canvas></div>
+        <div class="tbl-wrap">
+          <table id="rel-mes-tbl">
+            <thead><tr><th>Mês</th><th>Qtde Faturada (t)</th><th>Valor (R$)</th><th>R$/t Médio</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Carregamentos detalhado -->
+      <div id="rel-tab-carregamentos" hidden>
+        <div class="tbl-wrap">
+          <table id="rel-carr-tbl">
+            <thead><tr><th>NF</th><th>Data</th><th>Produto</th><th>Fornecedor</th><th>Modal</th><th>Entrada (t)</th><th>Faturado (t)</th><th>Saldo (t)</th><th>% Fat.</th><th>Custo R$/t</th><th>Valor NF (R$)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Notas SF detalhado -->
+      <div id="rel-tab-notas" hidden>
+        <div class="tbl-wrap">
+          <table id="rel-nota-tbl">
+            <thead><tr><th>Nota SF</th><th>Data</th><th>Produto</th><th>Cliente</th><th>Carregamento</th><th>Modal</th><th>Fornecedor</th><th>Qtde (t)</th><th>Valor (R$)</th><th>R$/t</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HISTÓRICO ──────────────────────────────────────────────── -->
+    <section id="sec-historico" hidden>
+      <div class="section-header">
+        <h2>Histórico de Ações</h2>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="loadHistorico()">↻ Atualizar</button>
+        </div>
+      </div>
+      <div class="filter-bar" style="flex-wrap:wrap">
+        <select id="h-entidade" onchange="loadHistorico()">
+          <option value="">Todas as entidades</option>
+          <option value="carregamento">Carregamentos</option>
+          <option value="nota_sf">Notas SF</option>
+          <option value="pedido">Pedidos</option>
+          <option value="produto">Produtos</option>
+          <option value="fornecedor">Fornecedores</option>
+          <option value="cliente">Clientes</option>
+        </select>
+        <select id="h-acao" onchange="loadHistorico()">
+          <option value="">Todas as ações</option>
+          <option value="CRIOU">Criou</option>
+          <option value="EDITOU">Editou</option>
+          <option value="EXCLUIU">Excluiu</option>
+        </select>
+        <input type="date" id="h-data-ini" onchange="loadHistorico()">
+        <input type="date" id="h-data-fim" onchange="loadHistorico()">
+      </div>
+      <div class="tbl-wrap">
+        <table id="hist-tbl">
+          <thead><tr><th>Data / Hora</th><th>Usuário</th><th>Ação</th><th>Módulo</th><th>Descrição</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="hist-pag" style="display:flex;gap:.5rem;justify-content:center;margin-top:.8rem;flex-wrap:wrap"></div>
+    </section>
+
+    <!-- ── CADASTROS ─────────────────────────────────────────────── -->
+    <section id="sec-cadastros" hidden>
+      <div class="section-header"><h2>Cadastros</h2></div>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('produtos')">🌾 Produtos</button>
+        <button class="tab" onclick="switchTab('fornecedores')">🚚 Fornecedores</button>
+        <button class="tab" onclick="switchTab('clientes')">👤 Clientes</button>
+      </div>
+
+      <!-- Produtos -->
+      <div id="tab-produtos">
+        <div class="section-header" style="margin-bottom:.8rem">
+          <span style="flex:1;font-size:.85rem;color:var(--muted)">Gerencie os tipos de produto/material</span>
+          <button class="btn btn-primary btn-sm" onclick="openProdModal()">+ Produto</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="prod-tbl">
+            <thead><tr><th>Nome</th><th>Unidade</th><th>Descrição</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Fornecedores -->
+      <div id="tab-fornecedores" hidden>
+        <div class="section-header" style="margin-bottom:.8rem">
+          <span style="flex:1;font-size:.85rem;color:var(--muted)">Empresas fornecedoras dos materiais</span>
+          <button class="btn btn-primary btn-sm" onclick="openFornModal()">+ Fornecedor</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="forn-tbl">
+            <thead><tr><th>Nome</th><th>CNPJ</th><th>Telefone</th><th>Cidade/UF</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Clientes -->
+      <div id="tab-clientes" hidden>
+        <div class="section-header" style="margin-bottom:.8rem">
+          <span style="flex:1;font-size:.85rem;color:var(--muted)">Produtores rurais e clientes da cooperativa</span>
+          <button class="btn btn-primary btn-sm" onclick="openCliModal()">+ Cliente</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="cli-tbl">
+            <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Cidade/UF</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /content -->
+
+  <footer>COOCAMM — Controle de Notas 2026 | <span id="footer-date"></span></footer>
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ══════════════════════ MODALS ══════════════════════ -->
+
+<!-- Modal Carregamento -->
+<div class="modal-bg" id="modal-carr" hidden>
+<div class="modal-box">
+  <div class="modal-head"><h3 id="carr-modal-title">Novo Carregamento</h3><button onclick="closeModal('modal-carr')">✕</button></div>
+  <div class="modal-body">
+    <div class="form-row">
+      <div class="field"><label>Nota NF *</label><input id="c-nota_nf" placeholder="0000013048"></div>
+      <div class="field"><label>Data *</label><input id="c-data" type="date"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Produto *</label><select id="c-produto"></select></div>
+      <div class="field"><label>Modal *</label>
+        <select id="c-modal"><option value="FOB">FOB</option><option value="CIF">CIF</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Quantidade (t) *</label><input id="c-quantidade" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Custo (R$/t) *</label><input id="c-custo_ton" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Fornecedor</label><select id="c-fornecedor_id"><option value="">— Selecione —</option></select></div>
+      <div class="field"><label>Série/Filial</label><input id="c-serie_filial" placeholder="Ex: 001"></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-carr')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitCarr()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Nota SF -->
+<div class="modal-bg" id="modal-nota" hidden>
+<div class="modal-box">
+  <div class="modal-head"><h3 id="nota-modal-title">Nova Nota SF</h3><button onclick="closeModal('modal-nota')">✕</button></div>
+  <div class="modal-body">
+    <div class="form-row">
+      <div class="field"><label>Nota SF *</label><input id="n-nota_sf" placeholder="0000013145"></div>
+      <div class="field"><label>Data *</label><input id="n-data" type="date"></div>
+    </div>
+    <div class="field">
+      <label>Produto *</label><select id="n-produto"></select>
+    </div>
+    <div class="field">
+      <label>Carregamento *</label>
+      <select id="n-carregamento_id" onchange="updateSaldoHint()"><option value="">— Selecione o produto primeiro —</option></select>
+      <div class="hint" id="n-saldo-hint"></div>
+    </div>
+    <div class="field">
+      <label>Cliente *</label><select id="n-cliente_id"><option value="">— Selecione —</option></select>
+    </div>
+    <div class="form-row">
+      <div class="field"><label>Quantidade (t) *</label><input id="n-quantidade" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Valor Total (R$) *</label><input id="n-valor_total" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="field"><label>Código Fiscal</label><input id="n-codigo_fiscal" placeholder="Ex: 5922"></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-nota')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitNota()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Pedido -->
+<div class="modal-bg" id="modal-pedido" hidden>
+<div class="modal-box">
+  <div class="modal-head"><h3 id="pedido-modal-title">Novo Pedido</h3><button onclick="closeModal('modal-pedido')">✕</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Cliente *</label><select id="p-cliente_id"><option value="">— Selecione —</option></select></div>
+    <div class="field"><label>Produto</label><select id="p-produto"><option value="">— Selecione —</option></select></div>
+    <div class="form-row">
+      <div class="field"><label>Qtde Pedida (t) *</label><input id="p-qtde_pedida" type="number" step="0.01" placeholder="0.00"></div>
+      <div class="field"><label>Qtde Entregue (t)</label><input id="p-qtde_entregue" type="number" step="0.01" placeholder="0.00"></div>
+    </div>
+    <div class="field"><label>Observação</label><textarea id="p-observacao" rows="2" placeholder="Opcional..."></textarea></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-pedido')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitPedido()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Produto -->
+<div class="modal-bg" id="modal-prod" hidden>
+<div class="modal-box" style="max-width:400px">
+  <div class="modal-head"><h3 id="prod-modal-title">Novo Produto</h3><button onclick="closeModal('modal-prod')">✕</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Nome *</label><input id="pr-nome" placeholder="Ex: CALCÁRIO"></div>
+    <div class="field"><label>Unidade *</label>
+      <select id="pr-unidade">
+        <option value="t">Tonelada (t)</option>
+        <option value="kg">Quilograma (kg)</option>
+        <option value="sc">Saca (sc)</option>
+        <option value="L">Litro (L)</option>
+        <option value="un">Unidade (un)</option>
+      </select>
+    </div>
+    <div class="field"><label>Descrição</label><textarea id="pr-descricao" rows="2" placeholder="Descrição opcional"></textarea></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-prod')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitProd()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Fornecedor -->
+<div class="modal-bg" id="modal-forn" hidden>
+<div class="modal-box" style="max-width:460px">
+  <div class="modal-head"><h3 id="forn-modal-title">Novo Fornecedor</h3><button onclick="closeModal('modal-forn')">✕</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Nome / Razão Social *</label><input id="fo-nome" placeholder="Ex: Mineradora Ibiatã Ltda."></div>
+    <div class="form-row">
+      <div class="field"><label>CNPJ</label><input id="fo-cnpj" placeholder="00.000.000/0001-00"></div>
+      <div class="field"><label>Telefone</label><input id="fo-telefone" placeholder="(16) 9 9999-9999"></div>
+    </div>
+    <div class="field"><label>E-mail</label><input id="fo-email" type="email" placeholder="contato@empresa.com.br"></div>
+    <div class="form-row">
+      <div class="field"><label>Cidade</label><input id="fo-cidade" placeholder="São Paulo"></div>
+      <div class="field"><label>UF</label><input id="fo-estado" placeholder="SP" maxlength="2" style="text-transform:uppercase"></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-forn')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitForn()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Cliente -->
+<div class="modal-bg" id="modal-cli" hidden>
+<div class="modal-box" style="max-width:460px">
+  <div class="modal-head"><h3 id="cli-modal-title">Novo Cliente</h3><button onclick="closeModal('modal-cli')">✕</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Nome *</label><input id="cl-nome" placeholder="Ex: João da Silva"></div>
+    <div class="form-row">
+      <div class="field"><label>CPF / CNPJ</label><input id="cl-cpf_cnpj" placeholder="000.000.000-00"></div>
+      <div class="field"><label>Telefone</label><input id="cl-telefone" placeholder="(16) 9 9999-9999"></div>
+    </div>
+    <div class="field"><label>E-mail</label><input id="cl-email" type="email" placeholder="cliente@email.com"></div>
+    <div class="form-row">
+      <div class="field"><label>Cidade</label><input id="cl-cidade" placeholder="Ribeirão Preto"></div>
+      <div class="field"><label>UF</label><input id="cl-estado" placeholder="SP" maxlength="2" style="text-transform:uppercase"></div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-cli')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitCli()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Confirm Delete -->
+<div class="modal-bg" id="confirm-modal" hidden>
+<div class="modal-box" style="max-width:360px">
+  <div class="modal-head"><h3>Confirmar exclusão</h3><button onclick="closeModal('confirm-modal')">✕</button></div>
+  <div class="modal-body"><p id="confirm-msg">Tem certeza que deseja excluir este registro?</p></div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('confirm-modal')">Cancelar</button>
+    <button class="btn btn-danger" id="confirm-ok-btn">Excluir</button>
+  </div>
+</div>
+</div>
+
+<!-- Toast -->
+<div id="toast-wrap"></div>
+
+<!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
+<script>
+// ─── STATE ──────────────────────────────────────────────────────────────────
+const S = {
+  token: localStorage.getItem('ibiata_token'),
+  user: null,
+  produtos: [], fornecedores: [], clientes: [],
+  carregamentos: [], notas: [], pedidos: [],
+  editId: null, editType: null,
+  dashChart: null
+};
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+async function req(method, path, body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json', ...(S.token ? { Authorization: `Bearer ${S.token}` } : {}) }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/api' + path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'Erro desconhecido');
+  return data;
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pass = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('login-err');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Preencha e-mail e senha'; return; }
+  try {
+    const data = await req('POST', '/auth/login', { email, password: pass });
+    S.token = data.token; S.user = data.user;
+    localStorage.setItem('ibiata_token', S.token);
+    showApp();
+  } catch(e) { errEl.textContent = e.message; }
+}
+
+function doLogout() {
+  S.token = null; S.user = null;
+  localStorage.removeItem('ibiata_token');
+  document.getElementById('app').hidden = true;
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+const SECTIONS = { dashboard:'Dashboard', carregamentos:'Carregamentos', notas:'Notas SF', pedidos:'Pedidos', relatorios:'Relatórios', historico:'Histórico', cadastros:'Cadastros' };
+
+function navigate(sec) {
+  Object.keys(SECTIONS).forEach(s => {
+    const el = document.getElementById('sec-' + s);
+    if (el) el.hidden = s !== sec;
+    document.querySelectorAll('#sidebar nav a').forEach(a => {
+      a.classList.toggle('active', a.dataset.sec === sec);
+    });
+  });
+  document.getElementById('page-title').textContent = SECTIONS[sec] || sec;
+  closeSidebar();
+  if (sec === 'dashboard') loadDashboard();
+  if (sec === 'carregamentos') loadCarregamentos();
+  if (sec === 'notas') loadNotas();
+  if (sec === 'pedidos') loadPedidos();
+  if (sec === 'relatorios') { initRelFiltros(); gerarRelatorio(); }
+  if (sec === 'historico') loadHistorico();
+  if (sec === 'cadastros') loadCadastros();
+}
+
+// ─── SHOW APP ────────────────────────────────────────────────────────────────
+async function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').hidden = false;
+  document.getElementById('footer-date').textContent = new Date().toLocaleDateString('pt-BR');
+  const email = S.user?.email || localStorage.getItem('ibiata_email') || '';
+  document.getElementById('user-email').textContent = email;
+  document.getElementById('user-badge').textContent = email.split('@')[0] || 'Usuário';
+  // Load lookup data
+  try {
+    [S.produtos, S.fornecedores, S.clientes] = await Promise.all([
+      req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes')
+    ]);
+  } catch(e) { toast('Erro ao carregar cadastros: ' + e.message, 'err'); }
+  await loadDashboard();
+}
+
+// ─── DASHBOARD ───────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const d = await req('GET', '/dashboard');
+    // Stats
+    document.getElementById('dash-stats').innerHTML = `
+      <div class="stat-card"><div class="label">Total Carregado</div><div class="value">${fmt(d.total_carregado)}</div><div class="sub">toneladas</div></div>
+      <div class="stat-card yellow"><div class="label">Total Faturado</div><div class="value">${fmt(d.total_faturado)}</div><div class="sub">toneladas</div></div>
+      <div class="stat-card brown"><div class="label">Saldo a Faturar</div><div class="value">${fmt(d.saldo_faturar)}</div><div class="sub">toneladas</div></div>
+      <div class="stat-card blue"><div class="label">Pedidos em Aberto</div><div class="value">${d.pedidos_abertos}</div><div class="sub">aguardando entrega</div></div>
+    `;
+    // Chart
+    const prods = Object.keys(d.por_produto || {});
+    const carrs = prods.map(p => d.por_produto[p].carregado);
+    const fats = prods.map(p => d.por_produto[p].faturado);
+    if (S.dashChart) S.dashChart.destroy();
+    S.dashChart = new Chart(document.getElementById('chart-produto'), {
+      type: 'bar',
+      data: {
+        labels: prods,
+        datasets: [
+          { label: 'Carregado (t)', data: carrs, backgroundColor: '#c8ddca', borderRadius: 4 },
+          { label: 'Faturado (t)', data: fats, backgroundColor: '#1a5c38', borderRadius: 4 }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+    });
+    // Pedidos
+    const pedEls = (d.pedidos_em_aberto || []).map(p => {
+      const ent = parseFloat(p.quantidade_entregue || 0), ped = parseFloat(p.quantidade_pedida);
+      const pct = Math.min((ent / ped) * 100, 100);
+      return `<div style="margin-bottom:.7rem">
+        <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.2rem">
+          <span>${p.cliente_nome || p.cliente_id || '—'} <span style="color:var(--muted)">(${p.produto || '—'})</span></span>
+          <span style="color:var(--muted)">${fmt(ent)}/${fmt(ped)} t</span>
+        </div>
+        <div class="prog"><div class="prog-fill${pct>=100?' done':''}" style="width:${pct}%"></div></div>
+      </div>`;
+    });
+    document.getElementById('dash-pedidos').innerHTML = pedEls.length ? pedEls.join('') : '<p style="color:var(--muted);font-size:.85rem;padding:.5rem 0">Nenhum pedido em aberto.</p>';
+    // Últimas notas
+    const tbody = document.querySelector('#dash-notas-tbl tbody');
+    tbody.innerHTML = (d.ultimas_notas || []).map(n => `<tr>
+      <td>${n.nota_sf}</td><td>${fmtDate(n.data)}</td><td>${n.produto}</td>
+      <td>${n.cliente_nome || n.clientes?.nome || '—'}</td>
+      <td>${fmt(n.quantidade)}</td><td>${fmtMoney(n.valor_total)}</td>
+    </tr>`).join('') || `<tr><td colspan="6" class="tbl-empty">Nenhuma nota lançada.</td></tr>`;
+  } catch(e) { toast('Erro no dashboard: ' + e.message, 'err'); }
+}
+
+// ─── CARREGAMENTOS ───────────────────────────────────────────────────────────
+async function loadCarregamentos() {
+  populateSelect('f-carr-prod', S.produtos, 'nome', 'nome', 'Todos os produtos');
+  populateSelect('f-carr-forn', S.fornecedores, 'id', 'nome', 'Todos os fornecedores');
+  const params = {};
+  const p = document.getElementById('f-carr-prod')?.value;
+  const m = document.getElementById('f-carr-modal')?.value;
+  const f = document.getElementById('f-carr-forn')?.value;
+  if (p) params.produto = p;
+  if (m) params.modal = m;
+  if (f) params.fornecedor_id = f;
+  try {
+    S.carregamentos = await req('GET', '/carregamentos?' + new URLSearchParams(params));
+    renderCarregamentos();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+function renderCarregamentos() {
+  const tb = document.querySelector('#carr-tbl tbody');
+  if (!S.carregamentos.length) { tb.innerHTML = `<tr><td colspan="11" class="tbl-empty">Nenhum carregamento encontrado.</td></tr>`; return; }
+  tb.innerHTML = S.carregamentos.map(c => {
+    const pct = c.quantidade > 0 ? (c.faturado / c.quantidade) * 100 : 0;
+    const badgeSt = c.status === 'Encerrado' ? 'badge-closed' : c.status === 'Quase enc.' ? 'badge-almost' : 'badge-open';
+    return `<tr>
+      <td><strong>${c.nota_nf}</strong></td>
+      <td>${fmtDate(c.data)}</td>
+      <td>${c.produto}</td>
+      <td>${c.fornecedor_nome || '—'}</td>
+      <td><span class="badge badge-${c.modal.toLowerCase()}">${c.modal}</span></td>
+      <td>${fmt(c.quantidade)}</td>
+      <td>${fmt(c.faturado)}</td>
+      <td><strong>${fmt(c.saldo)}</strong></td>
+      <td>${fmtMoney(c.custo_ton)}</td>
+      <td><span class="badge ${badgeSt}">${c.status}</span></td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick='editCarr(${JSON.stringify(c)})'>✎</button>
+        <button class="btn btn-danger btn-sm" onclick='confirmDelete("carregamento","${c.id}")'>🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openCarrModal(c = null) {
+  S.editId = c?.id || null; S.editType = 'carr';
+  document.getElementById('carr-modal-title').textContent = c ? 'Editar Carregamento' : 'Novo Carregamento';
+  const fields = { 'c-nota_nf': c?.nota_nf||'', 'c-data': c?.data||today(), 'c-quantidade': c?.quantidade||'', 'c-custo_ton': c?.custo_ton||'', 'c-serie_filial': c?.serie_filial||'' };
+  Object.entries(fields).forEach(([id, v]) => document.getElementById(id).value = v);
+  populateSelect('c-produto', S.produtos, 'nome', 'nome');
+  document.getElementById('c-produto').value = c?.produto || '';
+  const fornSel = document.getElementById('c-fornecedor_id');
+  fornSel.innerHTML = '<option value="">— Nenhum —</option>' + S.fornecedores.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
+  fornSel.value = c?.fornecedor_id || '';
+  document.getElementById('c-modal').value = c?.modal || 'FOB';
+  openModal('modal-carr');
+}
+
+function editCarr(c) { openCarrModal(c); }
+
+async function submitCarr() {
+  const d = {
+    nota_nf: v('c-nota_nf'), data: v('c-data'), produto: v('c-produto'),
+    modal: v('c-modal'), quantidade: v('c-quantidade'), custo_ton: v('c-custo_ton'),
+    serie_filial: v('c-serie_filial'), fornecedor_id: v('c-fornecedor_id') || null
+  };
+  try {
+    if (S.editId) await req('PUT', '/carregamentos/' + S.editId, d);
+    else await req('POST', '/carregamentos', d);
+    closeModal('modal-carr'); toast('Carregamento salvo!'); loadCarregamentos();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ─── NOTAS SF ────────────────────────────────────────────────────────────────
+async function loadNotas() {
+  populateSelect('f-nota-prod', S.produtos, 'nome', 'nome', 'Todos os produtos');
+  const params = {};
+  const p = document.getElementById('f-nota-prod')?.value;
+  const cli = document.getElementById('f-nota-cli')?.value;
+  if (p) params.produto = p;
+  if (cli) params.cliente = cli;
+  try {
+    S.notas = await req('GET', '/notas-sf?' + new URLSearchParams(params));
+    renderNotas();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+function renderNotas() {
+  const tb = document.querySelector('#nota-tbl tbody');
+  if (!S.notas.length) { tb.innerHTML = `<tr><td colspan="8" class="tbl-empty">Nenhuma nota encontrada.</td></tr>`; return; }
+  tb.innerHTML = S.notas.map(n => `<tr>
+    <td><strong>${n.nota_sf}</strong></td>
+    <td>${fmtDate(n.data)}</td>
+    <td>${n.produto}</td>
+    <td>${n.cliente_nome || '—'}</td>
+    <td>${fmt(n.quantidade)}</td>
+    <td>${fmtMoney(n.valor_total)}</td>
+    <td style="font-size:.78rem;color:var(--muted)">${n.carregamentos?.nota_nf || '—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick='confirmDelete("nota","${n.id}")'>🗑</button></td>
+  </tr>`).join('');
+}
+
+async function openNotaModal() {
+  S.editId = null; S.editType = 'nota';
+  document.getElementById('nota-modal-title').textContent = 'Nova Nota SF';
+  document.getElementById('n-data').value = today();
+  document.getElementById('n-nota_sf').value = '';
+  document.getElementById('n-quantidade').value = '';
+  document.getElementById('n-valor_total').value = '';
+  document.getElementById('n-codigo_fiscal').value = '';
+  document.getElementById('n-saldo-hint').textContent = '';
+
+  // Populate produto
+  const prodSel = document.getElementById('n-produto');
+  prodSel.innerHTML = '<option value="">— Selecione —</option>' + S.produtos.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+  prodSel.onchange = async () => {
+    await updateCarrSelect();
+    updateSaldoHint();
+  };
+
+  // Populate clientes
+  populateSelectEl(document.getElementById('n-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
+
+  document.getElementById('n-carregamento_id').innerHTML = '<option value="">— Selecione o produto primeiro —</option>';
+  openModal('modal-nota');
+}
+
+async function updateCarrSelect() {
+  const prod = v('n-produto');
+  const sel = document.getElementById('n-carregamento_id');
+  if (!prod) { sel.innerHTML = '<option value="">— Selecione o produto primeiro —</option>'; return; }
+  // Filter carregamentos by product with saldo > 0
+  let carrs = S.carregamentos.filter(c => c.produto === prod && c.saldo > 0.001);
+  if (!carrs.length) {
+    // Load fresh
+    try {
+      const all = await req('GET', '/carregamentos?produto=' + encodeURIComponent(prod));
+      S.carregamentos = [...S.carregamentos.filter(c => c.produto !== prod), ...all];
+      carrs = all.filter(c => c.saldo > 0.001);
+    } catch(e) {}
+  }
+  sel.innerHTML = '<option value="">— Selecione —</option>' + carrs.map(c =>
+    `<option value="${c.id}" data-saldo="${c.saldo}">NF ${c.nota_nf} — ${c.modal} — Saldo: ${fmt(c.saldo)} t</option>`
+  ).join('');
+}
+
+function updateSaldoHint() {
+  const sel = document.getElementById('n-carregamento_id');
+  const opt = sel.options[sel.selectedIndex];
+  const saldo = opt?.dataset?.saldo;
+  document.getElementById('n-saldo-hint').textContent = saldo ? `Saldo disponível: ${fmt(parseFloat(saldo))} t` : '';
+}
+
+async function submitNota() {
+  const d = {
+    nota_sf: v('n-nota_sf'), data: v('n-data'), produto: v('n-produto'),
+    carregamento_id: v('n-carregamento_id'), cliente_id: v('n-cliente_id'),
+    quantidade: v('n-quantidade'), valor_total: v('n-valor_total'), codigo_fiscal: v('n-codigo_fiscal')
+  };
+  try {
+    await req('POST', '/notas-sf', d);
+    closeModal('modal-nota'); toast('Nota SF lançada!');
+    // Refresh carregamentos to update saldos
+    S.carregamentos = await req('GET', '/carregamentos');
+    loadNotas();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ─── PEDIDOS ─────────────────────────────────────────────────────────────────
+async function loadPedidos() {
+  try {
+    S.pedidos = await req('GET', '/pedidos');
+    renderPedidos();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+function renderPedidos() {
+  const tb = document.querySelector('#pedido-tbl tbody');
+  if (!S.pedidos.length) { tb.innerHTML = `<tr><td colspan="7" class="tbl-empty">Nenhum pedido cadastrado.</td></tr>`; return; }
+  tb.innerHTML = S.pedidos.map(p => {
+    const ent = parseFloat(p.quantidade_entregue || 0), ped = parseFloat(p.quantidade_pedida);
+    const saldo = ped - ent;
+    const pct = ped > 0 ? Math.min((ent / ped) * 100, 100) : 0;
+    const cls = ent >= ped ? 'done' : pct >= 80 ? 'warn' : '';
+    return `<tr>
+      <td>${p.cliente_nome || '—'}</td>
+      <td>${p.produto || '—'}</td>
+      <td>${fmt(ped)}</td>
+      <td>${fmt(ent)}</td>
+      <td><strong ${saldo > 0 ? '' : 'style="color:var(--green-l)"'}>${fmt(saldo)}</strong></td>
+      <td><div style="display:flex;align-items:center;gap:.5rem">
+        <div class="prog" style="min-width:60px"><div class="prog-fill ${cls}" style="width:${pct}%"></div></div>
+        <span style="font-size:.75rem;color:var(--muted);white-space:nowrap">${pct.toFixed(0)}%</span>
+      </div></td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick='editPedido(${JSON.stringify(p)})'>✎</button>
+        <button class="btn btn-danger btn-sm" onclick='confirmDelete("pedido","${p.id}")'>🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openPedidoModal(p = null) {
+  S.editId = p?.id || null; S.editType = 'pedido';
+  document.getElementById('pedido-modal-title').textContent = p ? 'Editar Pedido' : 'Novo Pedido';
+  populateSelectEl(document.getElementById('p-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
+  const prodSel = document.getElementById('p-produto');
+  prodSel.innerHTML = '<option value="">— Selecione —</option>' + S.produtos.map(pr => `<option value="${pr.nome}">${pr.nome}</option>`).join('');
+  document.getElementById('p-cliente_id').value = p?.cliente_id || '';
+  document.getElementById('p-produto').value = p?.produto || '';
+  document.getElementById('p-qtde_pedida').value = p?.quantidade_pedida || '';
+  document.getElementById('p-qtde_entregue').value = p?.quantidade_entregue || 0;
+  document.getElementById('p-observacao').value = p?.observacao || '';
+  openModal('modal-pedido');
+}
+
+function editPedido(p) { openPedidoModal(p); }
+
+async function submitPedido() {
+  const d = {
+    cliente_id: v('p-cliente_id'), produto: v('p-produto'),
+    quantidade_pedida: v('p-qtde_pedida'), quantidade_entregue: v('p-qtde_entregue'),
+    observacao: v('p-observacao')
+  };
+  try {
+    if (S.editId) await req('PUT', '/pedidos/' + S.editId, d);
+    else await req('POST', '/pedidos', d);
+    closeModal('modal-pedido'); toast('Pedido salvo!'); loadPedidos();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ─── CADASTROS ────────────────────────────────────────────────────────────────
+async function loadCadastros() {
+  try {
+    [S.produtos, S.fornecedores, S.clientes] = await Promise.all([
+      req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes')
+    ]);
+    renderProd(); renderForn(); renderCli();
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+function renderProd() {
+  const tb = document.querySelector('#prod-tbl tbody');
+  tb.innerHTML = S.produtos.length ? S.produtos.map(p => `<tr>
+    <td><strong>${p.nome}</strong></td><td>${p.unidade}</td><td>${p.descricao || '—'}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick='editProd(${JSON.stringify(p)})'>✎</button>
+      <button class="btn btn-danger btn-sm" onclick='confirmDelete("produto","${p.id}")'>🗑</button>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="4" class="tbl-empty">Nenhum produto cadastrado.</td></tr>`;
+}
+
+function renderForn() {
+  const tb = document.querySelector('#forn-tbl tbody');
+  tb.innerHTML = S.fornecedores.length ? S.fornecedores.map(f => `<tr>
+    <td><strong>${f.nome}</strong></td><td>${f.cnpj || '—'}</td><td>${f.telefone || '—'}</td>
+    <td>${f.cidade || '—'}${f.estado ? '/' + f.estado : ''}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick='editForn(${JSON.stringify(f)})'>✎</button>
+      <button class="btn btn-danger btn-sm" onclick='confirmDelete("fornecedor","${f.id}")'>🗑</button>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum fornecedor cadastrado.</td></tr>`;
+}
+
+function renderCli() {
+  const tb = document.querySelector('#cli-tbl tbody');
+  tb.innerHTML = S.clientes.length ? S.clientes.map(c => `<tr>
+    <td><strong>${c.nome}</strong></td><td>${c.cpf_cnpj || '—'}</td><td>${c.telefone || '—'}</td>
+    <td>${c.cidade || '—'}${c.estado ? '/' + c.estado : ''}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick='editCli(${JSON.stringify(c)})'>✎</button>
+      <button class="btn btn-danger btn-sm" onclick='confirmDelete("cliente","${c.id}")'>🗑</button>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum cliente cadastrado.</td></tr>`;
+}
+
+function switchTab(t) {
+  ['produtos','fornecedores','clientes'].forEach(tab => {
+    document.getElementById('tab-'+tab).hidden = tab !== t;
+  });
+  document.querySelectorAll('.tabs .tab').forEach((btn, i) => {
+    btn.classList.toggle('active', ['produtos','fornecedores','clientes'][i] === t);
+  });
+}
+
+// Produto modal
+function openProdModal(pr = null) {
+  S.editId = pr?.id || null;
+  document.getElementById('prod-modal-title').textContent = pr ? 'Editar Produto' : 'Novo Produto';
+  document.getElementById('pr-nome').value = pr?.nome || '';
+  document.getElementById('pr-unidade').value = pr?.unidade || 't';
+  document.getElementById('pr-descricao').value = pr?.descricao || '';
+  openModal('modal-prod');
+}
+function editProd(pr) { openProdModal(pr); }
+async function submitProd() {
+  const d = { nome: v('pr-nome'), unidade: v('pr-unidade'), descricao: v('pr-descricao') };
+  try {
+    if (S.editId) await req('PUT', '/produtos/' + S.editId, d);
+    else await req('POST', '/produtos', d);
+    closeModal('modal-prod'); toast('Produto salvo!'); loadCadastros();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// Fornecedor modal
+function openFornModal(f = null) {
+  S.editId = f?.id || null;
+  document.getElementById('forn-modal-title').textContent = f ? 'Editar Fornecedor' : 'Novo Fornecedor';
+  ['nome','cnpj','telefone','email','cidade','estado'].forEach(k => {
+    document.getElementById('fo-'+k).value = f?.[k] || '';
+  });
+  openModal('modal-forn');
+}
+function editForn(f) { openFornModal(f); }
+async function submitForn() {
+  const d = { nome:v('fo-nome'),cnpj:v('fo-cnpj'),telefone:v('fo-telefone'),email:v('fo-email'),cidade:v('fo-cidade'),estado:v('fo-estado').toUpperCase() };
+  try {
+    if (S.editId) await req('PUT', '/fornecedores/' + S.editId, d);
+    else await req('POST', '/fornecedores', d);
+    closeModal('modal-forn'); toast('Fornecedor salvo!'); loadCadastros();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// Cliente modal
+function openCliModal(c = null) {
+  S.editId = c?.id || null;
+  document.getElementById('cli-modal-title').textContent = c ? 'Editar Cliente' : 'Novo Cliente';
+  ['nome','cpf_cnpj','telefone','email','cidade','estado'].forEach(k => {
+    document.getElementById('cl-'+k).value = c?.[k] || '';
+  });
+  openModal('modal-cli');
+}
+function editCli(c) { openCliModal(c); }
+async function submitCli() {
+  const d = { nome:v('cl-nome'),cpf_cnpj:v('cl-cpf_cnpj'),telefone:v('cl-telefone'),email:v('cl-email'),cidade:v('cl-cidade'),estado:v('cl-estado').toUpperCase() };
+  try {
+    if (S.editId) await req('PUT', '/clientes/' + S.editId, d);
+    else await req('POST', '/clientes', d);
+    closeModal('modal-cli'); toast('Cliente salvo!'); loadCadastros();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ─── DELETE CONFIRM ──────────────────────────────────────────────────────────
+function confirmDelete(type, id) {
+  const msgs = {
+    carregamento: 'Excluir este carregamento? As notas SF vinculadas NÃO serão excluídas.',
+    nota: 'Excluir esta nota SF? O saldo do carregamento será restaurado.',
+    pedido: 'Excluir este pedido?',
+    produto: 'Excluir este produto?',
+    fornecedor: 'Excluir este fornecedor?',
+    cliente: 'Excluir este cliente?'
+  };
+  document.getElementById('confirm-msg').textContent = msgs[type] || 'Confirmar exclusão?';
+  document.getElementById('confirm-ok-btn').onclick = async () => {
+    try {
+      const paths = { carregamento:'/carregamentos/', nota:'/notas-sf/', pedido:'/pedidos/', produto:'/produtos/', fornecedor:'/fornecedores/', cliente:'/clientes/' };
+      await req('DELETE', paths[type] + id);
+      closeModal('confirm-modal'); toast('Excluído com sucesso!');
+      const reloaders = { carregamento: loadCarregamentos, nota: loadNotas, pedido: loadPedidos, produto: loadCadastros, fornecedor: loadCadastros, cliente: loadCadastros };
+      reloaders[type]?.();
+    } catch(e) { toast(e.message, 'err'); }
+  };
+  openModal('confirm-modal');
+}
+
+// ─── CSV EXPORT ──────────────────────────────────────────────────────────────
+function exportCSV(type) {
+  let rows, headers, filename;
+  if (type === 'carregamentos') {
+    headers = ['Nota NF','Data','Produto','Fornecedor','Modal','Entrada(t)','Faturado(t)','Saldo(t)','Custo R$/t','Status'];
+    rows = S.carregamentos.map(c => [c.nota_nf,c.data,c.produto,c.fornecedor_nome,c.modal,c.quantidade,c.faturado,c.saldo,c.custo_ton,c.status]);
+    filename = 'carregamentos.csv';
+  } else {
+    headers = ['Nota SF','Data','Produto','Cliente','Qtde(t)','Valor(R$)','Carregamento'];
+    rows = S.notas.map(n => [n.nota_sf,n.data,n.produto,n.cliente_nome,n.quantidade,n.valor_total,n.carregamentos?.nota_nf||'']);
+    filename = 'notas_sf.csv';
+  }
+  const csv = [headers, ...rows].map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿'+csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = filename; a.click();
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const v = id => document.getElementById(id)?.value?.trim() || '';
+const today = () => new Date().toISOString().split('T')[0];
+const fmt = n => (parseFloat(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtMoney = n => 'R$ ' + fmt(n);
+const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+
+function populateSelect(id, arr, valKey, labelKey, emptyLabel = null) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = (emptyLabel ? `<option value="">${emptyLabel}</option>` : '') +
+    arr.map(i => `<option value="${i[valKey]}">${i[labelKey]}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+function populateSelectEl(sel, arr, valKey, labelKey, emptyLabel) {
+  sel.innerHTML = (emptyLabel ? `<option value="">${emptyLabel}</option>` : '') +
+    arr.map(i => `<option value="${i[valKey]}">${i[labelKey]}</option>`).join('');
+}
+
+function openModal(id) { document.getElementById(id).hidden = false; }
+function closeModal(id) { document.getElementById(id).hidden = true; }
+
+function toast(msg, type = 'ok') {
+  const icons = { ok: '✓', err: '✗', warn: '⚠' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'i'}</span> <span>${msg}</span>`;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), type === 'err' ? 5000 : 3000);
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('show');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('overlay').classList.remove('show');
+}
+
+// ─── EVENT LISTENERS ─────────────────────────────────────────────────────────
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('btn-logout').addEventListener('click', doLogout);
+document.getElementById('overlay').addEventListener('click', closeSidebar);
+document.getElementById('l-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+document.querySelectorAll('#sidebar nav a[data-sec]').forEach(a => {
+  a.addEventListener('click', e => { e.preventDefault(); navigate(a.dataset.sec); });
+});
+
+// Close modals on background click
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.hidden = true; });
+});
+
+// ─── RELATÓRIOS ───────────────────────────────────────────────────────────────
+let relData = { resumo: null, carrs: [], notas: [] };
+let relCharts = {};
+
+function initRelFiltros() {
+  populateSelect('r-produto', S.produtos, 'nome', 'nome', 'Todos');
+  populateSelect('r-fornecedor', S.fornecedores, 'id', 'nome', 'Todos');
+  populateSelectEl(document.getElementById('r-cliente'), S.clientes, 'id', 'nome', 'Todos');
+}
+
+async function gerarRelatorio() {
+  initRelFiltros();
+  const params = {};
+  const ini = v('r-data-ini'), fim = v('r-data-fim'), prod = v('r-produto'),
+        forn = v('r-fornecedor'), modal = v('r-modal'), cli = v('r-cliente');
+  if (ini) params.data_ini = ini;
+  if (fim) params.data_fim = fim;
+  if (prod) params.produto = prod;
+  if (forn) params.fornecedor_id = forn;
+  if (modal) params.modal = modal;
+  if (cli) params.cliente_id = cli;
+  const qs = new URLSearchParams(params);
+  try {
+    [relData.resumo, relData.carrs, relData.notas] = await Promise.all([
+      req('GET', '/relatorios/resumo?' + qs),
+      req('GET', '/relatorios/carregamentos?' + qs),
+      req('GET', '/relatorios/notas-sf?' + qs)
+    ]);
+    renderRelStats();
+    renderRelProduto();
+    renderRelClientes();
+    renderRelMensal();
+    renderRelCarregamentos();
+    renderRelNotas();
+    toast('Relatório gerado!');
+  } catch(e) { toast('Erro: ' + e.message, 'err'); }
+}
+
+function renderRelStats() {
+  const d = relData.resumo;
+  if (!d) return;
+  const els = document.querySelectorAll('#rel-stats .rv');
+  if (els.length >= 6) {
+    els[0].textContent = fmt(d.total_carregado) + ' t';
+    els[1].textContent = fmt(d.total_faturado) + ' t';
+    els[2].textContent = fmtMoney(d.valor_total_faturado);
+    els[3].textContent = fmt(d.saldo_faturar) + ' t';
+    els[4].textContent = d.qtd_notas;
+    els[5].textContent = fmtMoney(d.ticket_medio) + '/t';
+  }
+}
+
+function renderRelProduto() {
+  const d = relData.resumo?.por_produto || {};
+  const prods = Object.keys(d);
+  // Destroy old charts
+  ['rel-chart-prod','rel-chart-valor'].forEach(id => { if (relCharts[id]) { relCharts[id].destroy(); delete relCharts[id]; } });
+
+  relCharts['rel-chart-prod'] = new Chart(document.getElementById('rel-chart-prod'), {
+    type: 'bar',
+    data: {
+      labels: prods,
+      datasets: [
+        { label: 'Carregado (t)', data: prods.map(p=>d[p].carregado), backgroundColor: '#c8ddca', borderRadius:4 },
+        { label: 'Faturado (t)', data: prods.map(p=>d[p].faturado), backgroundColor: '#1a5c38', borderRadius:4 }
+      ]
+    },
+    options: { responsive:true, plugins:{ title:{ display:true, text:'Carregado vs Faturado por Produto' }, legend:{position:'bottom'} }, scales:{ y:{beginAtZero:true} } }
+  });
+
+  relCharts['rel-chart-valor'] = new Chart(document.getElementById('rel-chart-valor'), {
+    type: 'doughnut',
+    data: {
+      labels: prods,
+      datasets: [{ data: prods.map(p=>d[p].valor), backgroundColor: ['#1a5c38','#c4992e','#2471a3','#8B6914','#27ae60'] }]
+    },
+    options: { responsive:true, plugins:{ title:{ display:true, text:'Valor Faturado por Produto (R$)' }, legend:{position:'bottom'} } }
+  });
+
+  const tb = document.querySelector('#rel-prod-tbl tbody');
+  tb.innerHTML = prods.length ? prods.map(p => {
+    const r = d[p], pct = r.carregado > 0 ? (r.faturado/r.carregado*100).toFixed(1) : 0;
+    return `<tr>
+      <td><strong>${p}</strong></td><td>${fmt(r.carregado)}</td><td>${fmt(r.faturado)}</td>
+      <td>${fmt(r.saldo)}</td>
+      <td><div style="display:flex;align-items:center;gap:.4rem"><div class="prog" style="min-width:50px"><div class="prog-fill" style="width:${pct}%"></div></div>${pct}%</div></td>
+      <td>${fmtMoney(r.valor)}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" class="tbl-empty">Nenhum dado. Clique em "Gerar Relatório".</td></tr>`;
+}
+
+function renderRelClientes() {
+  const d = relData.resumo?.por_cliente || {};
+  const clientes = Object.entries(d).sort((a,b)=>b[1].faturado-a[1].faturado);
+  const tb = document.querySelector('#rel-cli-tbl tbody');
+  tb.innerHTML = clientes.length ? clientes.map(([nome, r]) => {
+    const media = r.faturado > 0 ? r.valor/r.faturado : 0;
+    return `<tr><td><strong>${nome}</strong></td><td>${fmt(r.faturado)}</td><td>${fmtMoney(r.valor)}</td><td>${r.notas}</td><td>${fmtMoney(media)}</td></tr>`;
+  }).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum dado.</td></tr>`;
+}
+
+function renderRelMensal() {
+  const d = relData.resumo?.por_mes || {};
+  const meses = Object.keys(d).sort();
+  if (relCharts['rel-chart-mensal']) { relCharts['rel-chart-mensal'].destroy(); }
+  relCharts['rel-chart-mensal'] = new Chart(document.getElementById('rel-chart-mensal'), {
+    type: 'line',
+    data: {
+      labels: meses.map(m => { const [y,mo]=m.split('-'); return `${mo}/${y}`; }),
+      datasets: [
+        { label: 'Qtde Faturada (t)', data: meses.map(m=>d[m].faturado), borderColor:'#1a5c38', backgroundColor:'rgba(26,92,56,.1)', fill:true, tension:.3, yAxisID:'y' },
+        { label: 'Valor (R$)', data: meses.map(m=>d[m].valor), borderColor:'#c4992e', backgroundColor:'rgba(196,153,46,.1)', fill:true, tension:.3, yAxisID:'y2' }
+      ]
+    },
+    options: { responsive:true, interaction:{mode:'index'}, plugins:{ title:{display:true,text:'Evolução Mensal de Faturamento'}, legend:{position:'bottom'} }, scales:{ y:{beginAtZero:true,title:{display:true,text:'Toneladas'}}, y2:{beginAtZero:true,position:'right',title:{display:true,text:'R$'},grid:{drawOnChartArea:false}} } }
+  });
+  const tb = document.querySelector('#rel-mes-tbl tbody');
+  tb.innerHTML = meses.length ? meses.map(m => {
+    const r = d[m], med = r.faturado>0?r.valor/r.faturado:0;
+    const [y,mo]=m.split('-');
+    return `<tr><td>${mo}/${y}</td><td>${fmt(r.faturado)}</td><td>${fmtMoney(r.valor)}</td><td>${fmtMoney(med)}</td></tr>`;
+  }).join('') : `<tr><td colspan="4" class="tbl-empty">Nenhum dado.</td></tr>`;
+}
+
+function renderRelCarregamentos() {
+  const tb = document.querySelector('#rel-carr-tbl tbody');
+  tb.innerHTML = relData.carrs.length ? relData.carrs.map(c => `<tr>
+    <td><strong>${c.nota_nf}</strong></td><td>${fmtDate(c.data)}</td><td>${c.produto}</td>
+    <td>${c.fornecedor_nome}</td><td><span class="badge badge-${(c.modal||'').toLowerCase()}">${c.modal}</span></td>
+    <td>${fmt(c.quantidade)}</td><td>${fmt(c.faturado)}</td><td>${fmt(c.saldo)}</td>
+    <td>${c.pct_faturado}%</td><td>${fmtMoney(c.custo_ton)}</td><td>${fmtMoney(c.valor_carregamento)}</td>
+  </tr>`).join('') : `<tr><td colspan="11" class="tbl-empty">Nenhum carregamento no período.</td></tr>`;
+}
+
+function renderRelNotas() {
+  const tb = document.querySelector('#rel-nota-tbl tbody');
+  tb.innerHTML = relData.notas.length ? relData.notas.map(n => `<tr>
+    <td><strong>${n.nota_sf}</strong></td><td>${fmtDate(n.data)}</td><td>${n.produto}</td>
+    <td>${n.cliente_nome}</td><td>${n.carr_nota}</td>
+    <td><span class="badge badge-${(n.carr_modal||'').toLowerCase()}">${n.carr_modal||'—'}</span></td>
+    <td>${n.carr_fornecedor}</td><td>${fmt(n.quantidade)}</td>
+    <td>${fmtMoney(n.valor_total)}</td><td>${fmtMoney(n.preco_ton)}</td>
+  </tr>`).join('') : `<tr><td colspan="10" class="tbl-empty">Nenhuma nota no período.</td></tr>`;
+}
+
+function switchRelTab(t) {
+  ['resumo','clientes','mensal','carregamentos','notas'].forEach(tab => {
+    document.getElementById('rel-tab-'+tab).hidden = tab !== t;
+  });
+  document.querySelectorAll('#rel-tabs .tab').forEach((btn,i) => {
+    btn.classList.toggle('active', ['resumo','clientes','mensal','carregamentos','notas'][i] === t);
+  });
+}
+
+function exportRelatorio() {
+  const tab = document.querySelector('#rel-tabs .tab.active')?.textContent?.trim() || '';
+  let rows, headers, filename;
+  if (tab.includes('Carregamento')) {
+    headers = ['NF','Data','Produto','Fornecedor','Modal','Entrada(t)','Faturado(t)','Saldo(t)','% Fat','Custo R$/t','Valor NF'];
+    rows = relData.carrs.map(c=>[c.nota_nf,c.data,c.produto,c.fornecedor_nome,c.modal,c.quantidade,c.faturado,c.saldo,c.pct_faturado+'%',c.custo_ton,c.valor_carregamento]);
+    filename = 'rel_carregamentos.csv';
+  } else if (tab.includes('Notas')) {
+    headers = ['Nota SF','Data','Produto','Cliente','Carregamento','Modal','Fornecedor','Qtde(t)','Valor(R$)','R$/t'];
+    rows = relData.notas.map(n=>[n.nota_sf,n.data,n.produto,n.cliente_nome,n.carr_nota,n.carr_modal,n.carr_fornecedor,n.quantidade,n.valor_total,n.preco_ton]);
+    filename = 'rel_notas_sf.csv';
+  } else if (tab.includes('Cliente')) {
+    const d = relData.resumo?.por_cliente||{};
+    headers = ['Cliente','Faturado(t)','Valor(R$)','Notas','R$/t Médio'];
+    rows = Object.entries(d).map(([nome,r])=>[nome,r.faturado.toFixed(2),r.valor.toFixed(2),r.notas,(r.faturado>0?r.valor/r.faturado:0).toFixed(2)]);
+    filename = 'rel_clientes.csv';
+  } else {
+    const d = relData.resumo?.por_produto||{};
+    headers = ['Produto','Carregado(t)','Faturado(t)','Saldo(t)','% Faturado','Valor(R$)'];
+    rows = Object.entries(d).map(([p,r])=>[p,r.carregado.toFixed(2),r.faturado.toFixed(2),r.saldo.toFixed(2),(r.carregado>0?r.faturado/r.carregado*100:0).toFixed(1)+'%',r.valor.toFixed(2)]);
+    filename = 'rel_por_produto.csv';
+  }
+  const csv = [headers,...rows].map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download = filename; a.click();
+}
+
+// ─── HISTÓRICO ────────────────────────────────────────────────────────────────
+let histPage = 1;
+
+async function loadHistorico(page = 1) {
+  histPage = page;
+  const params = { page, limit: 50 };
+  const ent = v('h-entidade'), ac = v('h-acao'), ini = v('h-data-ini'), fim = v('h-data-fim');
+  if (ent) params.entidade = ent;
+  if (ac) params.acao = ac;
+  if (ini) params.data_ini = ini;
+  if (fim) params.data_fim = fim;
+  try {
+    const d = await req('GET', '/historico?' + new URLSearchParams(params));
+    renderHistorico(d);
+  } catch(e) { toast('Erro ao carregar histórico. Execute o schema_update_v2.sql no Supabase.', 'warn'); }
+}
+
+const ENTIDADE_LABELS = { carregamento:'Carregamento', nota_sf:'Nota SF', pedido:'Pedido', produto:'Produto', fornecedor:'Fornecedor', cliente:'Cliente' };
+
+function renderHistorico(d) {
+  const tb = document.querySelector('#hist-tbl tbody');
+  tb.innerHTML = (d.data||[]).length ? d.data.map(h => `<tr>
+    <td style="white-space:nowrap;font-size:.8rem">${fmtDatetime(h.created_at)}</td>
+    <td style="font-size:.8rem">${h.usuario_email||'—'}</td>
+    <td><span class="acao-badge acao-${h.acao}">${h.acao}</span></td>
+    <td style="font-size:.8rem">${ENTIDADE_LABELS[h.entidade]||h.entidade}</td>
+    <td style="font-size:.82rem">${h.descricao}</td>
+  </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum registro encontrado.</td></tr>`;
+
+  // Paginação
+  const total = d.total || 0, limit = d.limit || 50;
+  const pages = Math.ceil(total / limit);
+  const pag = document.getElementById('hist-pag');
+  if (pages <= 1) { pag.innerHTML = ''; return; }
+  pag.innerHTML = Array.from({length:Math.min(pages,10)},(_,i)=>i+1).map(p=>
+    `<button class="btn btn-sm ${p===histPage?'btn-primary':'btn-outline'}" onclick="loadHistorico(${p})">${p}</button>`
+  ).join('');
+}
+
+const fmtDatetime = dt => dt ? new Date(dt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) : '—';
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+(async () => {
+  document.getElementById('footer-date').textContent = new Date().toLocaleDateString('pt-BR');
+  if (S.token) {
+    try {
+      // Validate token with a lightweight call
+      await req('GET', '/produtos');
+      await showApp();
+    } catch(e) {
+      // Token expired
+      localStorage.removeItem('ibiata_token');
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+})();
+</script>
+</body>
+</html>
