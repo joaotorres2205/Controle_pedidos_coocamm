@@ -46,6 +46,28 @@ async function logAction(userEmail, acao, entidade, entidadeId, descricao) {
   }
 }
 
+// ─── BAIXA AUTOMÁTICA DE PEDIDOS ─────────────────────────────────────────────
+// delta > 0 = incrementa entregue | delta < 0 = estorna entregue
+async function atualizarPedidoBaixa(clienteId, produto, delta) {
+  try {
+    const { data: pedido } = await supabase
+      .from('pedidos')
+      .select('id, quantidade_entregue')
+      .eq('cliente_id', clienteId)
+      .eq('produto', produto)
+      .maybeSingle();
+
+    if (!pedido) return; // nenhum pedido para este cliente+produto
+
+    const novaEntregue = Math.max(0, parseFloat(pedido.quantidade_entregue || 0) + delta);
+    await supabase.from('pedidos')
+      .update({ quantidade_entregue: novaEntregue, updated_at: new Date().toISOString() })
+      .eq('id', pedido.id);
+  } catch (e) {
+    console.error('[BAIXA PEDIDO]', e.message);
+  }
+}
+
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
@@ -395,24 +417,68 @@ app.post('/api/notas-sf', requireAuth, async (req, res) => {
     const { nota_sf, data, produto, carregamento_id, cliente_id, quantidade, valor_total, codigo_fiscal } = req.body;
     if (!nota_sf||!data||!produto||!carregamento_id||!cliente_id||!quantidade||!valor_total)
       return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
+
+    // Valida saldo do carregamento
     const { data: carr, error: carrErr } = await supabase.from('carregamentos').select('quantidade, notas_sf(quantidade)').eq('id', carregamento_id).single();
     if (carrErr) throw carrErr;
     const faturado = (carr.notas_sf||[]).reduce((s,sf)=>s+parseFloat(sf.quantidade||0),0);
     const saldo = parseFloat(carr.quantidade) - faturado;
     if (parseFloat(quantidade) > saldo + 0.001)
-      return res.status(400).json({ error: `Quantidade (${quantidade}t) excede o saldo disponível (${saldo.toFixed(2)}t)` });
-    const { data: result, error } = await supabase.from('notas_sf').insert([{ nota_sf, data, produto, carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal }]).select('*, clientes(nome)').single();
+      return res.status(400).json({ error: `Quantidade (${quantidade}t) excede o saldo do carregamento (${saldo.toFixed(2)}t)` });
+
+    const { data: result, error } = await supabase.from('notas_sf')
+      .insert([{ nota_sf, data, produto, carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal }])
+      .select('*, clientes(nome)').single();
     if (error) throw error;
+
+    // Baixa automática no pedido
+    await atualizarPedidoBaixa(cliente_id, produto, parseFloat(quantidade));
+
     logAction(req.user.email, 'CRIOU', 'nota_sf', result.id, `SF ${nota_sf} — ${result.clientes?.nome||cliente_id} — ${quantidade}t`);
+    res.json(result);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/notas-sf/:id', requireAuth, async (req, res) => {
+  try {
+    const { nota_sf, data, produto, carregamento_id, cliente_id, quantidade, valor_total, codigo_fiscal } = req.body;
+    if (!nota_sf||!data||!produto||!carregamento_id||!cliente_id||!quantidade||!valor_total)
+      return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
+
+    // Busca nota original para estorno
+    const { data: antiga, error: eAnt } = await supabase.from('notas_sf').select('*').eq('id', req.params.id).single();
+    if (eAnt) throw eAnt;
+
+    // Valida saldo (excluindo a própria nota do cálculo)
+    const { data: carr } = await supabase.from('carregamentos').select('quantidade, notas_sf(id, quantidade)').eq('id', carregamento_id).single();
+    const faturadoSemEsta = (carr.notas_sf||[]).filter(sf=>sf.id!==req.params.id).reduce((s,sf)=>s+parseFloat(sf.quantidade||0),0);
+    const saldo = parseFloat(carr.quantidade) - faturadoSemEsta;
+    if (parseFloat(quantidade) > saldo + 0.001)
+      return res.status(400).json({ error: `Quantidade (${quantidade}t) excede o saldo do carregamento (${saldo.toFixed(2)}t)` });
+
+    const { data: result, error } = await supabase.from('notas_sf')
+      .update({ nota_sf, data, produto, carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal })
+      .eq('id', req.params.id).select('*, clientes(nome)').single();
+    if (error) throw error;
+
+    // Estorna a baixa antiga e aplica a nova
+    await atualizarPedidoBaixa(antiga.cliente_id, antiga.produto, -parseFloat(antiga.quantidade));
+    await atualizarPedidoBaixa(cliente_id, produto, parseFloat(quantidade));
+
+    logAction(req.user.email, 'EDITOU', 'nota_sf', result.id, `SF ${nota_sf} — ${result.clientes?.nome||cliente_id} — ${quantidade}t`);
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.delete('/api/notas-sf/:id', requireAuth, async (req, res) => {
   try {
-    const { data: nota } = await supabase.from('notas_sf').select('nota_sf, quantidade').eq('id', req.params.id).single();
+    const { data: nota } = await supabase.from('notas_sf').select('*').eq('id', req.params.id).single();
     const { error } = await supabase.from('notas_sf').delete().eq('id', req.params.id);
     if (error) throw error;
+
+    // Estorna a baixa do pedido
+    if (nota) await atualizarPedidoBaixa(nota.cliente_id, nota.produto, -parseFloat(nota.quantidade||0));
+
     logAction(req.user.email, 'EXCLUIU', 'nota_sf', req.params.id, `SF ${nota?.nota_sf||req.params.id} — ${nota?.quantidade||'?'}t`);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

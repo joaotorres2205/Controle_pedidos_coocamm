@@ -945,7 +945,7 @@ function navigate(sec) {
   if (sec === 'carregamentos') loadCarregamentos();
   if (sec === 'notas') loadNotas();
   if (sec === 'pedidos') loadPedidos();
-  if (sec === 'relatorios') { initRelFiltros(); gerarRelatorio(); }
+  if (sec === 'relatorios') { initRelFiltros().then(() => gerarRelatorio()); }
   if (sec === 'historico') loadHistorico();
   if (sec === 'cadastros') loadCadastros();
 }
@@ -1118,7 +1118,10 @@ function renderCarregamentos() {
             <td>${fmtMoney(sf.valor_total)}</td>
             <td style="color:var(--muted)">${fmtMoney(preco)}</td>
             <td><span class="saldo-run ${saldoCorrente<=0.001?'zero':''}">${fmt(Math.max(saldoCorrente,0))}</span></td>
-            <td><button class="btn btn-danger btn-sm" onclick='confirmDelete("nota","${sf.id}")'>🗑</button></td>
+            <td>
+              <button class="btn btn-secondary btn-sm" onclick='editNotaSF(${JSON.stringify({id:sf.id,nota_sf:sf.nota_sf,data:sf.data,produto:sf.produto||c.produto,carregamento_id:sf.carregamento_id||c.id,cliente_id:sf.cliente_id,quantidade:sf.quantidade,valor_total:sf.valor_total,codigo_fiscal:sf.codigo_fiscal})})'>✎</button>
+              <button class="btn btn-danger btn-sm" onclick='confirmDelete("nota","${sf.id}")'>🗑</button>
+            </td>
           </tr>`;
         });
       }
@@ -1287,12 +1290,51 @@ async function submitNota() {
     quantidade: v('n-quantidade'), valor_total: v('n-valor_total'), codigo_fiscal: v('n-codigo_fiscal')
   };
   try {
-    await req('POST', '/notas-sf', d);
-    closeModal('modal-nota'); toast('Nota SF lançada!');
-    // Refresh carregamentos to update saldos
+    if (S.editId) {
+      await req('PUT', '/notas-sf/' + S.editId, d);
+      toast('Nota SF atualizada!');
+    } else {
+      await req('POST', '/notas-sf', d);
+      toast('Nota SF lançada!');
+    }
+    closeModal('modal-nota');
     S.carregamentos = await req('GET', '/carregamentos');
     loadNotas();
+    loadPedidos(); // atualiza pedidos com a baixa
   } catch(e) { toast(e.message, 'err'); }
+}
+
+async function editNotaSF(sf) {
+  S.editId = sf.id; S.editType = 'nota';
+  document.getElementById('nota-modal-title').textContent = 'Editar Nota SF';
+  document.getElementById('n-nota_sf').value = sf.nota_sf || '';
+  document.getElementById('n-data').value = sf.data || today();
+  document.getElementById('n-quantidade').value = sf.quantidade || '';
+  document.getElementById('n-valor_total').value = sf.valor_total || '';
+  document.getElementById('n-codigo_fiscal').value = sf.codigo_fiscal || '';
+  document.getElementById('n-saldo-hint').textContent = '';
+
+  // Garante dados carregados
+  if (!S.clientes.length) S.clientes = await req('GET', '/clientes');
+  if (!S.produtos.length) S.produtos = await req('GET', '/produtos');
+  if (!S.carregamentos.length) S.carregamentos = await req('GET', '/carregamentos');
+
+  // Popula produto
+  const prodSel = document.getElementById('n-produto');
+  prodSel.innerHTML = '<option value="">— Selecione —</option>' + S.produtos.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
+  prodSel.value = sf.produto || '';
+  prodSel.onchange = async () => { await updateCarrSelect(); updateSaldoHint(); };
+
+  // Popula clientes
+  populateSelectEl(document.getElementById('n-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
+  document.getElementById('n-cliente_id').value = sf.cliente_id || '';
+
+  // Popula carregamentos pelo produto atual
+  await updateCarrSelect();
+  document.getElementById('n-carregamento_id').value = sf.carregamento_id || '';
+  updateSaldoHint();
+
+  openModal('modal-nota');
 }
 
 // ─── PEDIDOS ─────────────────────────────────────────────────────────────────
@@ -1571,10 +1613,25 @@ document.querySelectorAll('.modal-bg').forEach(bg => {
 let relData = { resumo: null, carrs: [], notas: [] };
 let relCharts = {};
 
-function initRelFiltros() {
-  populateSelect('r-produto', S.produtos, 'nome', 'nome', 'Todos');
-  populateSelect('r-fornecedor', S.fornecedores, 'id', 'nome', 'Todos');
-  populateSelectEl(document.getElementById('r-cliente'), S.clientes, 'id', 'nome', 'Todos');
+async function initRelFiltros() {
+  // Garante que os dados de lookup estejam carregados
+  if (!S.produtos.length || !S.clientes.length || !S.fornecedores.length) {
+    try {
+      [S.produtos, S.fornecedores, S.clientes] = await Promise.all([
+        req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes')
+      ]);
+    } catch(e) { console.warn('initRelFiltros:', e.message); }
+  }
+  // Preserva seleção atual ao atualizar
+  const pv = document.getElementById('r-produto')?.value;
+  const fv = document.getElementById('r-fornecedor')?.value;
+  const cv = document.getElementById('r-cliente')?.value;
+  populateSelect('r-produto', S.produtos, 'nome', 'nome', 'Todos os produtos');
+  populateSelect('r-fornecedor', S.fornecedores, 'id', 'nome', 'Todos os fornecedores');
+  populateSelectEl(document.getElementById('r-cliente'), S.clientes, 'id', 'nome', 'Todos os clientes');
+  if (pv) document.getElementById('r-produto').value = pv;
+  if (fv) document.getElementById('r-fornecedor').value = fv;
+  if (cv) document.getElementById('r-cliente').value = cv;
 }
 
 async function gerarRelatorio() {
