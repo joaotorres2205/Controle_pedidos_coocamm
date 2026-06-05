@@ -330,7 +330,7 @@ app.delete('/api/clientes/:id', requireAuth, async (req, res) => {
 // ─── CARREGAMENTOS ────────────────────────────────────────────────────────────
 app.get('/api/carregamentos', requireAuth, async (req, res) => {
   try {
-    let q = supabase.from('carregamentos').select('*, notas_sf(id, quantidade), fornecedores(nome)').order('data', { ascending: false });
+    let q = supabase.from('carregamentos').select('*, notas_sf(id, nota_sf, data, quantidade, valor_total, codigo_fiscal, cliente_id, clientes(nome)), fornecedores(nome)').order('data', { ascending: false });
     if (req.query.produto) q = q.eq('produto', req.query.produto);
     if (req.query.modal) q = q.eq('modal', req.query.modal);
     if (req.query.fornecedor_id) q = q.eq('fornecedor_id', req.query.fornecedor_id);

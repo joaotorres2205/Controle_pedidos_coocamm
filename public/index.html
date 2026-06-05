@@ -241,6 +241,28 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 .tab.active{color:var(--green);background:var(--green-xl);box-shadow:inset 0 -2px 0 var(--green)}
 .tab:hover:not(.active){background:var(--bg);color:var(--green-d)}
 
+/* ─── HIERARQUIA CARREGAMENTOS ──────────────────────────────────────── */
+/* Verde: cabeçalho de produto */
+.carr-prod-hdr td{background:linear-gradient(90deg,#1a5c38,#2d8653)!important;color:#fff!important;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:.55rem 1rem!important}
+/* Azul: nota mãe (carregamento / NF do fornecedor) */
+.carr-parent{background:linear-gradient(90deg,#eff6ff,#f5f9ff)!important;cursor:pointer}
+.carr-parent:hover{background:linear-gradient(90deg,#dbeafe,#eff6ff)!important}
+.carr-parent td:first-child{border-left:4px solid #2563eb}
+.carr-parent td{color:#1e3a6e!important}
+/* Expandir */
+.expand-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:#dbeafe;color:#2563eb;font-size:.7rem;margin-right:.4rem;transition:transform .2s var(--ease);flex-shrink:0;border:1px solid rgba(37,99,235,.15)}
+.expand-icon.open{transform:rotate(90deg)}
+/* Brancas: saídas */
+.sf-child-wrap td{padding:0!important;border:none!important}
+.sf-inner-tbl{width:100%;border-collapse:collapse;background:#fefffe}
+.sf-inner-tbl thead th{background:#f1f8f3;color:var(--muted);padding:.45rem 1rem;font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);border-radius:0}
+.sf-inner-tbl tbody tr{border-bottom:1px solid rgba(212,227,208,.25);background:#fff}
+.sf-inner-tbl tbody tr:hover{background:#f7fdf9}
+.sf-inner-tbl tbody td{padding:.5rem 1rem;font-size:.82rem;vertical-align:middle;color:var(--text)}
+.sf-child-indent{padding-left:2.2rem!important}
+.sf-count-pill{display:inline-flex;align-items:center;padding:.1rem .45rem;border-radius:20px;font-size:.67rem;font-weight:700;background:#dbeafe;color:#1d4ed8;border:1px solid rgba(37,99,235,.15);margin-left:.3rem;vertical-align:middle}
+.saldo-run{font-weight:700;color:var(--green-d)}
+.saldo-run.zero{color:var(--muted);font-weight:400}
 /* Mobile */
 @media(max-width:700px){
   #sidebar{transform:translateX(-100%)}
@@ -409,7 +431,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         <h2>Carregamentos — NF de Remessa</h2>
         <div class="actions">
           <button class="btn btn-secondary btn-sm" onclick="exportCSV('carregamentos')">↓ CSV</button>
-          <button class="btn btn-primary btn-sm" onclick="openCarrModal()">+ Novo</button>
+          <button class="btn btn-primary btn-sm" onclick="openCarrModal()">+ Lançar Nota Mãe</button>
         </div>
       </div>
       <div class="filter-bar">
@@ -445,7 +467,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         <h2>Notas de Simples Faturamento</h2>
         <div class="actions">
           <button class="btn btn-secondary btn-sm" onclick="exportCSV('notas')">↓ CSV</button>
-          <button class="btn btn-primary btn-sm" onclick="openNotaModal()">+ Nova SF</button>
+          <button class="btn btn-primary btn-sm" onclick="openNotaModal()">+ Lançar Saída</button>
         </div>
       </div>
       <div class="filter-bar">
@@ -1014,27 +1036,117 @@ async function loadCarregamentos() {
 
 function renderCarregamentos() {
   const tb = document.querySelector('#carr-tbl tbody');
-  if (!S.carregamentos.length) { tb.innerHTML = `<tr><td colspan="11" class="tbl-empty">Nenhum carregamento encontrado.</td></tr>`; return; }
-  tb.innerHTML = S.carregamentos.map(c => {
-    const pct = c.quantidade > 0 ? (c.faturado / c.quantidade) * 100 : 0;
-    const badgeSt = c.status === 'Encerrado' ? 'badge-closed' : c.status === 'Quase enc.' ? 'badge-almost' : 'badge-open';
-    return `<tr>
-      <td><strong>${c.nota_nf}</strong></td>
-      <td>${fmtDate(c.data)}</td>
-      <td>${c.produto}</td>
-      <td>${c.fornecedor_nome || '—'}</td>
-      <td><span class="badge badge-${c.modal.toLowerCase()}">${c.modal}</span></td>
-      <td>${fmt(c.quantidade)}</td>
-      <td>${fmt(c.faturado)}</td>
-      <td><strong>${fmt(c.saldo)}</strong></td>
-      <td>${fmtMoney(c.custo_ton)}</td>
-      <td><span class="badge ${badgeSt}">${c.status}</span></td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick='editCarr(${JSON.stringify(c)})'>✎</button>
-        <button class="btn btn-danger btn-sm" onclick='confirmDelete("carregamento","${c.id}")'>🗑</button>
-      </td>
+  if (!S.carregamentos.length) {
+    tb.innerHTML = `<tr><td colspan="11" class="tbl-empty">Nenhum carregamento encontrado.</td></tr>`;
+    return;
+  }
+
+  // Agrupar por produto
+  const porProduto = {};
+  S.carregamentos.forEach(c => {
+    if (!porProduto[c.produto]) porProduto[c.produto] = [];
+    porProduto[c.produto].push(c);
+  });
+
+  let html = '';
+  Object.keys(porProduto).sort().forEach(produto => {
+    const lista = porProduto[produto];
+    const totalEntrada = lista.reduce((s,c) => s + parseFloat(c.quantidade), 0);
+    const totalFaturado = lista.reduce((s,c) => s + parseFloat(c.faturado), 0);
+    const totalSaldo = totalEntrada - totalFaturado;
+
+    // ── LINHA VERDE: cabeçalho do produto ────────────────────────────────
+    html += `<tr class="carr-prod-hdr">
+      <td colspan="6">🌾 ${produto} — ${lista.length} carregamento(s)</td>
+      <td>Fat: ${fmt(totalFaturado)} t</td>
+      <td>Saldo: ${fmt(totalSaldo)} t</td>
+      <td colspan="3">Entrada total: ${fmt(totalEntrada)} t</td>
     </tr>`;
-  }).join('');
+
+    lista.forEach(c => {
+      const badgeSt = c.status === 'Encerrado' ? 'badge-closed' : c.status === 'Quase enc.' ? 'badge-almost' : 'badge-open';
+      const sfs = (c.notas_sf || []).sort((a,b) => new Date(a.data) - new Date(b.data));
+      const sfCount = sfs.length;
+
+      // ── LINHA AZUL: nota mãe / NF do fornecedor (carregamento) ──────────
+      html += `<tr class="carr-parent" onclick="toggleCarr('sf-${c.id}')">
+        <td>
+          <span class="expand-icon" id="icon-${c.id}">▶</span>
+          <strong>${c.nota_nf}</strong>
+          <span class="sf-count-pill">${sfCount} saída${sfCount!==1?'s':''}</span>
+        </td>
+        <td>${fmtDate(c.data)}</td>
+        <td>${c.produto}</td>
+        <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem">${c.fornecedor_nome || '—'}</td>
+        <td><span class="badge badge-${(c.modal||'').toLowerCase()}">${c.modal}</span></td>
+        <td><strong>${fmt(c.quantidade)}</strong></td>
+        <td>${fmt(c.faturado)}</td>
+        <td><span class="saldo-run ${c.saldo<=0?'zero':''}">${fmt(c.saldo)}</span></td>
+        <td>${fmtMoney(c.custo_ton)}</td>
+        <td><span class="badge ${badgeSt}">${c.status}</span></td>
+        <td onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-sm" onclick='editCarr(${JSON.stringify(c)})'>✎</button>
+          <button class="btn btn-danger btn-sm" onclick='confirmDelete("carregamento","${c.id}")'>🗑</button>
+        </td>
+      </tr>`;
+
+      // ── LINHAS BRANCAS: saídas para clientes ────────────────────────────
+      html += `<tr class="sf-child-wrap" id="sf-${c.id}" hidden><td colspan="11">`;
+      html += `<table class="sf-inner-tbl"><thead><tr>
+        <th class="sf-child-indent">↳ Nota SF</th>
+        <th>Data</th><th>Cod. Fiscal</th><th>Cliente</th>
+        <th>Qtde (t)</th><th>Valor (R$)</th><th>R$/t</th>
+        <th>Saldo após saída</th><th></th>
+      </tr></thead><tbody>`;
+
+      if (sfs.length === 0) {
+        html += `<tr><td colspan="9" style="padding:1rem 2rem;color:var(--muted);font-size:.83rem">
+          Nenhuma saída lançada — saldo disponível: <strong>${fmt(c.quantidade)} t</strong>
+        </td></tr>`;
+      } else {
+        let saldoCorrente = parseFloat(c.quantidade);
+        sfs.forEach(sf => {
+          const qtde = parseFloat(sf.quantidade || 0);
+          saldoCorrente -= qtde;
+          const preco = qtde > 0 ? (parseFloat(sf.valor_total || 0) / qtde) : 0;
+          html += `<tr>
+            <td class="sf-child-indent"><strong>${sf.nota_sf}</strong></td>
+            <td>${fmtDate(sf.data)}</td>
+            <td style="color:var(--muted);font-size:.8rem">${sf.codigo_fiscal || '—'}</td>
+            <td>${sf.clientes?.nome || '—'}</td>
+            <td>${fmt(qtde)}</td>
+            <td>${fmtMoney(sf.valor_total)}</td>
+            <td style="color:var(--muted)">${fmtMoney(preco)}</td>
+            <td><span class="saldo-run ${saldoCorrente<=0.001?'zero':''}">${fmt(Math.max(saldoCorrente,0))}</span></td>
+            <td><button class="btn btn-danger btn-sm" onclick='confirmDelete("nota","${sf.id}")'>🗑</button></td>
+          </tr>`;
+        });
+      }
+
+      // Botão lançar saída no final da lista
+      html += `<tr style="background:#f5fdf7">
+        <td colspan="9" style="padding:.6rem 2rem">
+          <button class="btn btn-primary btn-sm" onclick="openNotaFromCarr('${c.id}','${c.produto}')">
+            ＋ Lançar Saída desta Nota
+          </button>
+          <span style="font-size:.75rem;color:var(--muted);margin-left:.7rem">Saldo disponível: <strong>${fmt(c.saldo)} t</strong></span>
+        </td>
+      </tr>`;
+
+      html += `</tbody></table></td></tr>`;
+    });
+  });
+
+  tb.innerHTML = html;
+}
+
+function toggleCarr(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const carrId = id.replace('sf-', '');
+  const icon = document.getElementById('icon-' + carrId);
+  row.hidden = !row.hidden;
+  if (icon) icon.classList.toggle('open', !row.hidden);
 }
 
 function openCarrModal(c = null) {
@@ -1095,9 +1207,9 @@ function renderNotas() {
   </tr>`).join('');
 }
 
-async function openNotaModal() {
+async function openNotaModal(preCarrId = null, preProduto = null) {
   S.editId = null; S.editType = 'nota';
-  document.getElementById('nota-modal-title').textContent = 'Nova Nota SF';
+  document.getElementById('nota-modal-title').textContent = 'Lançar Saída (Nota SF)';
   document.getElementById('n-data').value = today();
   document.getElementById('n-nota_sf').value = '';
   document.getElementById('n-quantidade').value = '';
@@ -1108,16 +1220,38 @@ async function openNotaModal() {
   // Populate produto
   const prodSel = document.getElementById('n-produto');
   prodSel.innerHTML = '<option value="">— Selecione —</option>' + S.produtos.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
-  prodSel.onchange = async () => {
-    await updateCarrSelect();
-    updateSaldoHint();
-  };
+  prodSel.onchange = async () => { await updateCarrSelect(); updateSaldoHint(); };
 
   // Populate clientes
   populateSelectEl(document.getElementById('n-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
 
-  document.getElementById('n-carregamento_id').innerHTML = '<option value="">— Selecione o produto primeiro —</option>';
+  // Pré-selecionar produto e carregamento se informados
+  if (preProduto) {
+    prodSel.value = preProduto;
+    await updateCarrSelect();
+    if (preCarrId) {
+      document.getElementById('n-carregamento_id').value = preCarrId;
+      updateSaldoHint();
+    }
+  } else {
+    document.getElementById('n-carregamento_id').innerHTML = '<option value="">— Selecione o produto primeiro —</option>';
+  }
+
   openModal('modal-nota');
+}
+
+// Atalho chamado pelo botão dentro da nota mãe expandida
+async function openNotaFromCarr(carrId, produto) {
+  // Garantir que os dados base estejam carregados
+  if (!S.clientes.length) {
+    try { S.clientes = await req('GET', '/clientes'); } catch(e) {}
+  }
+  if (!S.produtos.length) {
+    try { S.produtos = await req('GET', '/produtos'); } catch(e) {}
+  }
+  // Recarregar carregamentos com SFs atualizados
+  try { S.carregamentos = await req('GET', '/carregamentos'); } catch(e) {}
+  await openNotaModal(carrId, produto);
 }
 
 async function updateCarrSelect() {

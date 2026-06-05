@@ -3,6 +3,7 @@
 -- Execute no Supabase → SQL Editor → New Query
 -- ============================================================
 
+-- Já incluído no schema.sql principal (v2 mantido para referência)
 -- Tabela de histórico / auditoria
 CREATE TABLE IF NOT EXISTS historico (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
