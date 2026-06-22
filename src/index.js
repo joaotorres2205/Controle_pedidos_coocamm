@@ -54,7 +54,7 @@ async function atualizarPedidoBaixa(clienteId, produto, delta) {
       .from('pedidos')
       .select('id, quantidade_entregue')
       .eq('cliente_id', clienteId)
-      .eq('produto', produto)
+      .eq('produto', produto.toUpperCase())
       .maybeSingle();
 
     if (!pedido) return; // nenhum pedido para este cliente+produto
@@ -427,7 +427,7 @@ app.post('/api/notas-sf', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `Quantidade (${quantidade}t) excede o saldo do carregamento (${saldo.toFixed(2)}t)` });
 
     const { data: result, error } = await supabase.from('notas_sf')
-      .insert([{ nota_sf, data, produto, carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal }])
+      .insert([{ nota_sf, data, produto: produto?.toUpperCase(), carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal }])
       .select('*, clientes(nome)').single();
     if (error) throw error;
 
@@ -457,7 +457,7 @@ app.put('/api/notas-sf/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `Quantidade (${quantidade}t) excede o saldo do carregamento (${saldo.toFixed(2)}t)` });
 
     const { data: result, error } = await supabase.from('notas_sf')
-      .update({ nota_sf, data, produto, carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal })
+      .update({ nota_sf, data, produto: produto?.toUpperCase(), carregamento_id, cliente_id, quantidade:parseFloat(quantidade), valor_total:parseFloat(valor_total), codigo_fiscal })
       .eq('id', req.params.id).select('*, clientes(nome)').single();
     if (error) throw error;
 
@@ -497,7 +497,7 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
   try {
     const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao } = req.body;
     if (!cliente_id||!quantidade_pedida) return res.status(400).json({ error: 'Cliente e quantidade pedida são obrigatórios' });
-    const { data, error } = await supabase.from('pedidos').insert([{ cliente_id, produto, quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }]).select('*, clientes(nome)').single();
+    const { data, error } = await supabase.from('pedidos').insert([{ cliente_id, produto: produto?.toUpperCase(), quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }]).select('*, clientes(nome)').single();
     if (error) throw error;
     logAction(req.user.email, 'CRIOU', 'pedido', data.id, `Pedido ${data.clientes?.nome||cliente_id} — ${quantidade_pedida}t`);
     res.json(data);
@@ -507,7 +507,7 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
 app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
   try {
     const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao } = req.body;
-    const { data, error } = await supabase.from('pedidos').update({ cliente_id, produto, quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }).eq('id', req.params.id).select('*, clientes(nome)').single();
+    const { data, error } = await supabase.from('pedidos').update({ cliente_id, produto: produto?.toUpperCase(), quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }).eq('id', req.params.id).select('*, clientes(nome)').single();
     if (error) throw error;
     logAction(req.user.email, 'EDITOU', 'pedido', data.id, `Pedido ${data.clientes?.nome||cliente_id} — Entregue: ${quantidade_entregue}t`);
     res.json(data);

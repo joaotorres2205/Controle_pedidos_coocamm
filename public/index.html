@@ -1257,22 +1257,24 @@ async function openNotaFromCarr(carrId, produto) {
   await openNotaModal(carrId, produto);
 }
 
-async function updateCarrSelect() {
+async function updateCarrSelect(currentCarrId = null) {
   const prod = v('n-produto');
   const sel = document.getElementById('n-carregamento_id');
   if (!prod) { sel.innerHTML = '<option value="">— Selecione o produto primeiro —</option>'; return; }
-  // Filter carregamentos by product with saldo > 0
-  let carrs = S.carregamentos.filter(c => c.produto === prod && c.saldo > 0.001);
-  if (!carrs.length) {
-    // Load fresh
-    try {
-      const all = await req('GET', '/carregamentos?produto=' + encodeURIComponent(prod));
-      S.carregamentos = [...S.carregamentos.filter(c => c.produto !== prod), ...all];
-      carrs = all.filter(c => c.saldo > 0.001);
-    } catch(e) {}
-  }
+
+  // Recarrega sempre do servidor para ter saldo atualizado
+  try {
+    const all = await req('GET', '/carregamentos?produto=' + encodeURIComponent(prod));
+    S.carregamentos = [...S.carregamentos.filter(c => c.produto !== prod), ...all];
+  } catch(e) {}
+
+  // Inclui carregamentos com saldo OU o carregamento atual (editando)
+  const carrs = S.carregamentos.filter(c =>
+    c.produto === prod && (c.saldo > 0.001 || c.id === currentCarrId)
+  );
+
   sel.innerHTML = '<option value="">— Selecione —</option>' + carrs.map(c =>
-    `<option value="${c.id}" data-saldo="${c.saldo}">NF ${c.nota_nf} — ${c.modal} — Saldo: ${fmt(c.saldo)} t</option>`
+    `<option value="${c.id}" data-saldo="${c.saldo}">NF ${c.nota_nf} — Saldo: ${parseFloat(c.saldo).toFixed(2)}t</option>`
   ).join('');
 }
 
@@ -1290,17 +1292,14 @@ async function submitNota() {
     quantidade: v('n-quantidade'), valor_total: v('n-valor_total'), codigo_fiscal: v('n-codigo_fiscal')
   };
   try {
-    if (S.editId) {
-      await req('PUT', '/notas-sf/' + S.editId, d);
-      toast('Nota SF atualizada!');
-    } else {
-      await req('POST', '/notas-sf', d);
-      toast('Nota SF lançada!');
-    }
+    if (S.editId) await req('PUT', '/notas-sf/' + S.editId, d);
+    else await req('POST', '/notas-sf', d);
+    S.carregamentos = []; // invalida cache
     closeModal('modal-nota');
-    S.carregamentos = await req('GET', '/carregamentos');
-    loadNotas();
-    loadPedidos(); // atualiza pedidos com a baixa
+    toast(S.editId ? 'Nota SF atualizada!' : 'Nota SF lançada!');
+    await loadCarregamentos();   // refresh carregamentos (saldo)
+    await loadPedidos();         // refresh pedidos (baixa)
+    loadNotas();                 // refresh lista de notas
   } catch(e) { toast(e.message, 'err'); }
 }
 
@@ -1329,8 +1328,8 @@ async function editNotaSF(sf) {
   populateSelectEl(document.getElementById('n-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
   document.getElementById('n-cliente_id').value = sf.cliente_id || '';
 
-  // Popula carregamentos pelo produto atual
-  await updateCarrSelect();
+  // Popula carregamentos pelo produto atual (inclui o atual mesmo com saldo 0)
+  await updateCarrSelect(sf.carregamento_id);
   document.getElementById('n-carregamento_id').value = sf.carregamento_id || '';
   updateSaldoHint();
 
@@ -1406,6 +1405,7 @@ async function loadCadastros() {
     [S.produtos, S.fornecedores, S.clientes] = await Promise.all([
       req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes')
     ]);
+    console.log('[cadastros] produtos:', S.produtos.length, S.produtos);
     renderProd(); renderForn(); renderCli();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
@@ -1527,7 +1527,14 @@ function confirmDelete(type, id) {
       const paths = { carregamento:'/carregamentos/', nota:'/notas-sf/', pedido:'/pedidos/', produto:'/produtos/', fornecedor:'/fornecedores/', cliente:'/clientes/' };
       await req('DELETE', paths[type] + id);
       closeModal('confirm-modal'); toast('Excluído com sucesso!');
-      const reloaders = { carregamento: loadCarregamentos, nota: loadNotas, pedido: loadPedidos, produto: loadCadastros, fornecedor: loadCadastros, cliente: loadCadastros };
+      const reloaders = {
+        carregamento: () => { S.carregamentos = []; loadCarregamentos(); },
+        nota: async () => { S.carregamentos = []; await loadCarregamentos(); await loadPedidos(); loadNotas(); },
+        pedido: loadPedidos,
+        produto: loadCadastros,
+        fornecedor: loadCadastros,
+        cliente: loadCadastros
+      };
       reloaders[type]?.();
     } catch(e) { toast(e.message, 'err'); }
   };
