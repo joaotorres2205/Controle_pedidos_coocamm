@@ -967,13 +967,29 @@ const S = {
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 async function req(method, path, body = null) {
+  const hadToken = !!S.token; // distingue "sessão expirada" de uma simples tentativa de login
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json', ...(S.token ? { Authorization: `Bearer ${S.token}` } : {}) }
   };
   if (body) opts.body = JSON.stringify(body);
-  const r = await fetch('/api' + path, opts);
+  let r;
+  try {
+    r = await fetch('/api' + path, opts);
+  } catch (e) {
+    if (e.name === 'TypeError' && e.message.includes('fetch')) {
+      throw new Error('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
+    }
+    throw e;
+  }
   const data = await r.json();
+  if (r.status === 401 && hadToken) {
+    localStorage.removeItem('ibiata_token');
+    localStorage.removeItem('ibiata_email');
+    toast('Sessão expirada. Faça login novamente.', 'warn');
+    setTimeout(() => { document.getElementById('app').hidden = true; document.getElementById('login-screen').style.display='flex'; }, 1500);
+    throw new Error('Sessão expirada');
+  }
   if (!r.ok) throw new Error(data.error || 'Erro desconhecido');
   return data;
 }
@@ -1242,16 +1258,20 @@ function openCarrModal(c = null) {
 function editCarr(c) { openCarrModal(c); }
 
 async function submitCarr() {
-  const d = {
-    nota_nf: v('c-nota_nf'), data: v('c-data'), produto: v('c-produto'),
-    modal: v('c-modal'), quantidade: v('c-quantidade'), custo_ton: v('c-custo_ton'),
-    serie_filial: v('c-serie_filial'), fornecedor_id: v('c-fornecedor_id') || null
-  };
-  try {
-    if (S.editId) await req('PUT', '/carregamentos/' + S.editId, d);
-    else await req('POST', '/carregamentos', d);
-    closeModal('modal-carr'); toast('Carregamento salvo!'); loadCarregamentos();
-  } catch(e) { toast(e.message, 'err'); }
+  return withLoading('submitCarr', async () => {
+    const qtde = parseFloat(v('c-quantidade'));
+    if (!qtde || qtde <= 0) return toast('Quantidade deve ser maior que zero', 'err');
+    const d = {
+      nota_nf: v('c-nota_nf'), data: v('c-data'), produto: v('c-produto'),
+      modal: v('c-modal'), quantidade: v('c-quantidade'), custo_ton: v('c-custo_ton'),
+      serie_filial: v('c-serie_filial'), fornecedor_id: v('c-fornecedor_id') || null
+    };
+    try {
+      if (S.editId) await req('PUT', '/carregamentos/' + S.editId, d);
+      else await req('POST', '/carregamentos', d);
+      closeModal('modal-carr'); toast('Carregamento salvo!'); loadCarregamentos();
+    } catch(e) { toast(e.message, 'err'); }
+  })();
 }
 
 // ─── NOTAS SF ────────────────────────────────────────────────────────────────
@@ -1360,21 +1380,25 @@ function updateSaldoHint() {
 }
 
 async function submitNota() {
-  const d = {
-    nota_sf: v('n-nota_sf'), data: v('n-data'), produto: v('n-produto'),
-    carregamento_id: v('n-carregamento_id'), cliente_id: v('n-cliente_id'),
-    quantidade: v('n-quantidade'), valor_total: v('n-valor_total'), codigo_fiscal: v('n-codigo_fiscal')
-  };
-  try {
-    if (S.editId) await req('PUT', '/notas-sf/' + S.editId, d);
-    else await req('POST', '/notas-sf', d);
-    S.carregamentos = []; // invalida cache
-    closeModal('modal-nota');
-    toast(S.editId ? 'Nota SF atualizada!' : 'Nota SF lançada!');
-    await loadCarregamentos();   // refresh carregamentos (saldo)
-    await loadPedidos();         // refresh pedidos (baixa)
-    loadNotas();                 // refresh lista de notas
-  } catch(e) { toast(e.message, 'err'); }
+  return withLoading('submitNota', async () => {
+    const qtde = parseFloat(v('n-quantidade'));
+    if (!qtde || qtde <= 0) return toast('Quantidade deve ser maior que zero', 'err');
+    const d = {
+      nota_sf: v('n-nota_sf'), data: v('n-data'), produto: v('n-produto'),
+      carregamento_id: v('n-carregamento_id'), cliente_id: v('n-cliente_id'),
+      quantidade: v('n-quantidade'), valor_total: v('n-valor_total'), codigo_fiscal: v('n-codigo_fiscal')
+    };
+    try {
+      if (S.editId) await req('PUT', '/notas-sf/' + S.editId, d);
+      else await req('POST', '/notas-sf', d);
+      S.carregamentos = []; // invalida cache
+      closeModal('modal-nota');
+      toast(S.editId ? 'Nota SF atualizada!' : 'Nota SF lançada!');
+      await loadCarregamentos();   // refresh carregamentos (saldo)
+      await loadPedidos();         // refresh pedidos (baixa)
+      loadNotas();                 // refresh lista de notas
+    } catch(e) { toast(e.message, 'err'); }
+  })();
 }
 
 async function editNotaSF(sf) {
@@ -1588,30 +1612,32 @@ function editPedidoItem(item, ped) {
 }
 
 async function submitPedido() {
-  const cliente_id = v('p-cliente_id');
-  if (!cliente_id) { toast('Selecione um cliente', 'err'); return; }
-  const itens = [...document.querySelectorAll('#p-itens [data-row]')].map(r => ({
-    produto: r.querySelector('.pi-produto').value,
-    quantidade_pedida: r.querySelector('.pi-qtde').value,
-    embalagem_id: r.querySelector('.pi-embalagem').value || null,
-    preco_unitario: r.querySelector('.pi-preco').value || 0,
-    data_pagamento: r.querySelector('.pi-data_pagamento').value || null
-  }));
-  if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida)) {
-    toast('Informe ao menos um produto com quantidade pedida', 'err'); return;
-  }
-  try {
-    if (S.editId) {
-      await req('PUT', '/pedidos/' + S.editId, {
-        cliente_id, produto: itens[0].produto, quantidade_pedida: itens[0].quantidade_pedida,
-        quantidade_entregue: v('p-qtde_entregue') || 0, observacao: v('p-observacao'),
-        embalagem_id: itens[0].embalagem_id, preco_unitario: itens[0].preco_unitario, data_pagamento: itens[0].data_pagamento
-      });
-    } else {
-      await req('POST', '/pedidos', { cliente_id, observacao: v('p-observacao'), itens });
+  return withLoading('submitPedido', async () => {
+    const cliente_id = v('p-cliente_id');
+    if (!cliente_id) { toast('Selecione um cliente', 'err'); return; }
+    const itens = [...document.querySelectorAll('#p-itens [data-row]')].map(r => ({
+      produto: r.querySelector('.pi-produto').value,
+      quantidade_pedida: r.querySelector('.pi-qtde').value,
+      embalagem_id: r.querySelector('.pi-embalagem').value || null,
+      preco_unitario: r.querySelector('.pi-preco').value || 0,
+      data_pagamento: r.querySelector('.pi-data_pagamento').value || null
+    }));
+    if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida)) {
+      toast('Informe ao menos um produto com quantidade pedida', 'err'); return;
     }
-    closeModal('modal-pedido'); toast('Pedido salvo!'); loadPedidos();
-  } catch(e) { toast(e.message, 'err'); }
+    try {
+      if (S.editId) {
+        await req('PUT', '/pedidos/' + S.editId, {
+          cliente_id, produto: itens[0].produto, quantidade_pedida: itens[0].quantidade_pedida,
+          quantidade_entregue: v('p-qtde_entregue') || 0, observacao: v('p-observacao'),
+          embalagem_id: itens[0].embalagem_id, preco_unitario: itens[0].preco_unitario, data_pagamento: itens[0].data_pagamento
+        });
+      } else {
+        await req('POST', '/pedidos', { cliente_id, observacao: v('p-observacao'), itens });
+      }
+      closeModal('modal-pedido'); toast('Pedido salvo!'); loadPedidos();
+    } catch(e) { toast(e.message, 'err'); }
+  })();
 }
 
 function encerrarPedido(numero_pedido) {
@@ -1714,12 +1740,14 @@ function openProdModal(pr = null) {
 }
 function editProd(pr) { openProdModal(pr); }
 async function submitProd() {
-  const d = { nome: v('pr-nome'), unidade: v('pr-unidade'), descricao: v('pr-descricao') };
-  try {
-    if (S.editId) await req('PUT', '/produtos/' + S.editId, d);
-    else await req('POST', '/produtos', d);
-    closeModal('modal-prod'); toast('Produto salvo!'); loadCadastros();
-  } catch(e) { toast(e.message, 'err'); }
+  return withLoading('submitProd', async () => {
+    const d = { nome: v('pr-nome'), unidade: v('pr-unidade'), descricao: v('pr-descricao') };
+    try {
+      if (S.editId) await req('PUT', '/produtos/' + S.editId, d);
+      else await req('POST', '/produtos', d);
+      closeModal('modal-prod'); toast('Produto salvo!'); loadCadastros();
+    } catch(e) { toast(e.message, 'err'); }
+  })();
 }
 
 // Embalagem modal
@@ -1751,12 +1779,14 @@ function openFornModal(f = null) {
 }
 function editForn(f) { openFornModal(f); }
 async function submitForn() {
-  const d = { nome:v('fo-nome'),cnpj:v('fo-cnpj'),telefone:v('fo-telefone'),email:v('fo-email'),cidade:v('fo-cidade'),estado:v('fo-estado').toUpperCase() };
-  try {
-    if (S.editId) await req('PUT', '/fornecedores/' + S.editId, d);
-    else await req('POST', '/fornecedores', d);
-    closeModal('modal-forn'); toast('Fornecedor salvo!'); loadCadastros();
-  } catch(e) { toast(e.message, 'err'); }
+  return withLoading('submitForn', async () => {
+    const d = { nome:v('fo-nome'),cnpj:v('fo-cnpj'),telefone:v('fo-telefone'),email:v('fo-email'),cidade:v('fo-cidade'),estado:v('fo-estado').toUpperCase() };
+    try {
+      if (S.editId) await req('PUT', '/fornecedores/' + S.editId, d);
+      else await req('POST', '/fornecedores', d);
+      closeModal('modal-forn'); toast('Fornecedor salvo!'); loadCadastros();
+    } catch(e) { toast(e.message, 'err'); }
+  })();
 }
 
 // Cliente modal
@@ -1770,12 +1800,14 @@ function openCliModal(c = null) {
 }
 function editCli(c) { openCliModal(c); }
 async function submitCli() {
-  const d = { nome:v('cl-nome'),cpf_cnpj:v('cl-cpf_cnpj'),telefone:v('cl-telefone'),email:v('cl-email'),cidade:v('cl-cidade'),estado:v('cl-estado').toUpperCase() };
-  try {
-    if (S.editId) await req('PUT', '/clientes/' + S.editId, d);
-    else await req('POST', '/clientes', d);
-    closeModal('modal-cli'); toast('Cliente salvo!'); loadCadastros();
-  } catch(e) { toast(e.message, 'err'); }
+  return withLoading('submitCli', async () => {
+    const d = { nome:v('cl-nome'),cpf_cnpj:v('cl-cpf_cnpj'),telefone:v('cl-telefone'),email:v('cl-email'),cidade:v('cl-cidade'),estado:v('cl-estado').toUpperCase() };
+    try {
+      if (S.editId) await req('PUT', '/clientes/' + S.editId, d);
+      else await req('POST', '/clientes', d);
+      closeModal('modal-cli'); toast('Cliente salvo!'); loadCadastros();
+    } catch(e) { toast(e.message, 'err'); }
+  })();
 }
 
 // ─── USUÁRIOS ─────────────────────────────────────────────────────────────────
@@ -1819,17 +1851,19 @@ function resetSenha(id, email) {
 }
 
 async function submitUsuario() {
-  try {
-    if (S.editId) {
-      await req('PUT', '/usuarios/'+S.editId+'/senha', { password: v('usr-senha') });
-      toast('Senha atualizada!');
-    } else {
-      await req('POST', '/usuarios', { email: v('usr-email'), password: v('usr-senha') });
-      toast('Usuário criado com sucesso!');
-    }
-    closeModal('modal-usuario');
-    loadUsuarios();
-  } catch(e) { toast(e.message,'err'); }
+  return withLoading('submitUsuario', async () => {
+    try {
+      if (S.editId) {
+        await req('PUT', '/usuarios/'+S.editId+'/senha', { password: v('usr-senha') });
+        toast('Senha atualizada!');
+      } else {
+        await req('POST', '/usuarios', { email: v('usr-email'), password: v('usr-senha') });
+        toast('Usuário criado com sucesso!');
+      }
+      closeModal('modal-usuario');
+      loadUsuarios();
+    } catch(e) { toast(e.message,'err'); }
+  })();
 }
 
 function confirmDeleteUsuario(id, email) {
@@ -1977,6 +2011,16 @@ function toast(msg, type = 'ok') {
   el.innerHTML = `<span>${icons[type]||'i'}</span> <span>${msg}</span>`;
   document.getElementById('toast-wrap').appendChild(el);
   setTimeout(() => el.remove(), type === 'err' ? 5000 : 3000);
+}
+
+// Evita duplo envio: desabilita o botão "Salvar" enquanto a ação estiver em andamento
+function withLoading(btnId, fn) {
+  return async () => {
+    const btn = document.getElementById(btnId) || document.querySelector(`[onclick*="${btnId}"]`);
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+    try { await fn(); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; } }
+  };
 }
 
 function toggleSidebar() {
