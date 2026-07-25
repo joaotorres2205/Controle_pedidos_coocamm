@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
@@ -30,6 +31,7 @@ const supabaseAuth = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
+app.use(compression());
 app.use(helmet({ contentSecurityPolicy: false })); // CSP false pois usa CDN
 app.use(cors({
   origin: ['https://coocamm-pedidos.vercel.app', 'http://localhost:3000'],
