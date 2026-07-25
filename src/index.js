@@ -17,6 +17,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY || ''
 );
 
+// Cliente isolado exclusivo para operações de auth (login). NUNCA usar para .from():
+// signInWithPassword() atualiza a sessão interna do client, e o supabase-js troca
+// automaticamente o header Authorization do REST (.from()) pelo token da sessão ativa
+// em vez da service_role key — isso quebraria o bypass de RLS em todas as rotas
+// caso essa chamada fosse feita no client `supabase` acima.
+const supabaseAuth = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_KEY || '',
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
@@ -25,7 +36,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 const requireAuth = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'Token não fornecido' });
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
   if (error || !user) return res.status(401).json({ error: 'Sessão inválida. Faça login novamente.' });
   req.user = user;
   next();
@@ -40,6 +51,7 @@ async function atualizarPedidoBaixa(clienteId, produto, delta) {
       .select('id, quantidade_entregue')
       .eq('cliente_id', clienteId)
       .eq('produto', produto.toUpperCase())
+      .eq('status', 'aberto')
       .maybeSingle();
 
     if (!pedido) return; // nenhum pedido para este cliente+produto
@@ -57,7 +69,7 @@ async function atualizarPedidoBaixa(clienteId, produto, delta) {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' });
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabaseAuth.auth.signInWithPassword({ email, password });
   if (error) return res.status(401).json({ error: 'Email ou senha incorretos' });
   res.json({ token: data.session.access_token, user: { email: data.user.email, id: data.user.id } });
 });
@@ -226,7 +238,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       porProduto[c.produto].carregado += parseFloat(c.quantidade);
       porProduto[c.produto].faturado += calcSaldo(c).faturado;
     }
-    const pedidos_abertos = (pedidos||[]).filter(p=>parseFloat(p.quantidade_entregue||0)<parseFloat(p.quantidade_pedida));
+    const pedidos_abertos = (pedidos||[]).filter(p=>p.status!=='encerrado' && parseFloat(p.quantidade_entregue||0)<parseFloat(p.quantidade_pedida));
     res.json({ total_carregado, total_faturado, saldo_faturar:total_carregado-total_faturado, pedidos_abertos:pedidos_abertos.length, ultimas_notas:notas||[], por_produto:porProduto, pedidos_em_aberto:pedidos_abertos });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -287,15 +299,34 @@ app.get('/api/clientes', requireAuth, async (req, res) => {
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
 });
+function validaCpfCnpj(cpf_cnpj) {
+  if (!cpf_cnpj || !cpf_cnpj.trim()) return 'CPF/CNPJ é obrigatório';
+  const digits = cpf_cnpj.replace(/\D/g, '');
+  if (digits.length !== 11 && digits.length !== 14) return 'CPF/CNPJ inválido — informe 11 dígitos (CPF) ou 14 dígitos (CNPJ)';
+  return null;
+}
+
 app.post('/api/clientes', requireAuth, async (req, res) => {
   const { nome, cpf_cnpj, telefone, email, cidade, estado } = req.body;
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
+  const erroCpf = validaCpfCnpj(cpf_cnpj);
+  if (erroCpf) return res.status(400).json({ error: erroCpf });
+
+  const { data: existe } = await supabase.from('clientes').select('id,nome').eq('cpf_cnpj', cpf_cnpj).maybeSingle();
+  if (existe) return res.status(400).json({ error: `CPF/CNPJ já cadastrado para: ${existe.nome}` });
+
   const { data, error } = await supabase.from('clientes').insert([{ nome, cpf_cnpj, telefone, email, cidade, estado }]).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 app.put('/api/clientes/:id', requireAuth, async (req, res) => {
   const { nome, cpf_cnpj, telefone, email, cidade, estado } = req.body;
+  const erroCpf = validaCpfCnpj(cpf_cnpj);
+  if (erroCpf) return res.status(400).json({ error: erroCpf });
+
+  const { data: existe } = await supabase.from('clientes').select('id,nome').eq('cpf_cnpj', cpf_cnpj).neq('id', req.params.id).maybeSingle();
+  if (existe) return res.status(400).json({ error: `CPF/CNPJ já cadastrado para: ${existe.nome}` });
+
   const { data, error } = await supabase.from('clientes').update({ nome, cpf_cnpj, telefone, email, cidade, estado }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
@@ -436,30 +467,97 @@ app.delete('/api/notas-sf/:id', requireAuth, async (req, res) => {
 });
 
 // ─── PEDIDOS ──────────────────────────────────────────────────────────────────
+// Cada linha da tabela = 1 produto. N linhas com o mesmo numero_pedido formam 1 pedido.
 app.get('/api/pedidos', requireAuth, async (req, res) => {
   try {
     const { data, error } = await supabase.from('pedidos').select('*, clientes(nome)').order('created_at', { ascending: false });
     if (error) throw error;
-    res.json((data||[]).map(p=>({...p, cliente_nome:p.clientes?.nome||'—'})));
+
+    const grupos = {};
+    const ordem = [];
+    for (const p of (data || [])) {
+      const chave = p.numero_pedido || p.id;
+      if (!grupos[chave]) {
+        grupos[chave] = {
+          numero_pedido: p.numero_pedido, cliente_id: p.cliente_id,
+          cliente_nome: p.clientes?.nome || '—', observacao: p.observacao,
+          created_at: p.created_at, itens: [], _statuses: []
+        };
+        ordem.push(chave);
+      }
+      grupos[chave].itens.push({
+        id: p.id, produto: p.produto,
+        quantidade_pedida: parseFloat(p.quantidade_pedida),
+        quantidade_entregue: parseFloat(p.quantidade_entregue || 0),
+        status: p.status
+      });
+      grupos[chave]._statuses.push(p.status || 'aberto');
+    }
+    const result = ordem.map(k => {
+      const g = grupos[k];
+      g.status = g._statuses.every(s => s === 'encerrado') ? 'encerrado' : 'aberto';
+      delete g._statuses;
+      return g;
+    });
+    res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/pedidos', requireAuth, async (req, res) => {
   try {
-    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao } = req.body;
-    if (!cliente_id||!quantidade_pedida) return res.status(400).json({ error: 'Cliente e quantidade pedida são obrigatórios' });
-    const { data, error } = await supabase.from('pedidos').insert([{ cliente_id, produto: produto?.toUpperCase(), quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }]).select('*, clientes(nome)').single();
+    const { cliente_id, observacao } = req.body;
+    const itens = Array.isArray(req.body.itens) ? req.body.itens : [];
+    if (!cliente_id) return res.status(400).json({ error: 'Cliente é obrigatório' });
+    if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida))
+      return res.status(400).json({ error: 'Informe ao menos um produto com quantidade pedida' });
+
+    const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
+    const numero_pedido = `PED-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+
+    const rows = itens.map(it => ({
+      cliente_id, numero_pedido, status: 'aberto',
+      produto: String(it.produto).toUpperCase(),
+      quantidade_pedida: parseFloat(it.quantidade_pedida),
+      quantidade_entregue: 0,
+      observacao: observacao || null
+    }));
+
+    const { data, error } = await supabase.from('pedidos').insert(rows).select('*, clientes(nome)');
     if (error) throw error;
-    res.json(data);
+    res.json({
+      numero_pedido, cliente_id, cliente_nome: data[0]?.clientes?.nome || '—',
+      observacao, status: 'aberto',
+      itens: data.map(p => ({ id: p.id, produto: p.produto, quantidade_pedida: parseFloat(p.quantidade_pedida), quantidade_entregue: parseFloat(p.quantidade_entregue || 0), status: p.status }))
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
   try {
-    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao } = req.body;
-    const { data, error } = await supabase.from('pedidos').update({ cliente_id, produto: produto?.toUpperCase(), quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }).eq('id', req.params.id).select('*, clientes(nome)').single();
+    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao, status } = req.body;
+    const update = {
+      cliente_id, produto: produto?.toUpperCase(),
+      quantidade_pedida: parseFloat(quantidade_pedida),
+      quantidade_entregue: parseFloat(quantidade_entregue || 0),
+      observacao, updated_at: new Date().toISOString()
+    };
+    if (status === 'aberto' || status === 'encerrado') update.status = status;
+    const { data, error } = await supabase.from('pedidos').update(update).eq('id', req.params.id).select('*, clientes(nome)').single();
     if (error) throw error;
     res.json(data);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Encerra todos os itens de um pedido (mesmo numero_pedido) — saldo restante fica finalizado
+app.post('/api/pedidos/:numero_pedido/encerrar', requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('pedidos')
+      .update({ status: 'encerrado', updated_at: new Date().toISOString() })
+      .eq('numero_pedido', req.params.numero_pedido)
+      .select();
+    if (error) throw error;
+    if (!data.length) return res.status(404).json({ error: 'Pedido não encontrado' });
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

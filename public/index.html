@@ -229,6 +229,24 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 .rel-stat .rv{font-size:1.28rem;font-weight:700;color:var(--green-d);line-height:1;letter-spacing:-.3px}
 .rel-stat.y .rv{color:var(--gold-d)}.rel-stat.b .rv{color:var(--blue)}
 
+/* Busca autocomplete (search-select) */
+.search-select{position:relative}
+.search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--r-sm);box-shadow:var(--sh-md);max-height:220px;overflow-y:auto;z-index:60}
+.search-dropdown .opt{padding:.55rem .9rem;font-size:.86rem;cursor:pointer;color:var(--text)}
+.search-dropdown .opt:hover{background:var(--green-xl)}
+.search-dropdown .empty{padding:.6rem .9rem;font-size:.8rem;color:var(--muted)}
+
+/* Linhas de item do pedido (multi-produto) */
+.pedido-item-row{display:flex;gap:.5rem;margin-bottom:.6rem;align-items:center}
+.pedido-item-row select{flex:1.6}
+.pedido-item-row input{flex:1}
+.pedido-item-row .btn{flex-shrink:0}
+
+/* Hierarquia de pedidos (agrupado por numero_pedido) */
+.ped-parent{cursor:pointer}
+.ped-parent:hover{background:var(--green-xl)!important}
+.ped-child-wrap td{padding:0!important;border:none!important}
+
 /* Tabs */
 .tabs{display:flex;gap:.3rem;border-bottom:2px solid var(--border);margin-bottom:1.3rem}
 .tab{padding:.55rem 1.1rem;border-radius:8px 8px 0 0;font-size:.83rem;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;transition:var(--transition)}
@@ -491,7 +509,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         <table id="pedido-tbl">
           <thead>
             <tr>
-              <th>Cliente</th><th>Produto</th><th>Pedido (t)</th>
+              <th>Nº Pedido</th><th>Cliente</th><th>Produtos</th><th>Pedido (t)</th>
               <th>Entregue (t)</th><th>Saldo (t)</th><th>Progresso</th><th>Ações</th>
             </tr>
           </thead>
@@ -526,14 +544,17 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
             <select id="r-modal"><option value="">FOB e CIF</option><option value="FOB">FOB</option><option value="CIF">CIF</option></select>
           </div>
           <div class="field"><label>Cliente</label>
-            <select id="r-cliente"><option value="">Todos</option></select>
+            <div class="search-select">
+              <input id="r-cliente_search" autocomplete="off" placeholder="Todos os clientes...">
+              <input type="hidden" id="r-cliente">
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Stats -->
       <div class="rel-stats" id="rel-stats">
-        <div class="rel-stat"><div class="rl">Total Carregado</div><div class="rv">—</div></div>
+        <div class="rel-stat"><div class="rl">Total Comprado</div><div class="rv">—</div></div>
         <div class="rel-stat y"><div class="rl">Total Faturado</div><div class="rv">—</div></div>
         <div class="rel-stat b"><div class="rl">Valor Faturado</div><div class="rv">—</div></div>
         <div class="rel-stat br"><div class="rl">Saldo a Faturar</div><div class="rv">—</div></div>
@@ -558,7 +579,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         </div>
         <div class="tbl-wrap">
           <table id="rel-prod-tbl">
-            <thead><tr><th>Produto</th><th>Carregado (t)</th><th>Faturado (t)</th><th>Saldo (t)</th><th>% Faturado</th><th>Valor Total (R$)</th></tr></thead>
+            <thead><tr><th>Produto</th><th>Comprado (t)</th><th>Faturado (t)</th><th>Saldo (t)</th><th>% Faturado</th><th>Valor Total (R$)</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -715,7 +736,11 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
       <div class="hint" id="n-saldo-hint"></div>
     </div>
     <div class="field">
-      <label>Cliente *</label><select id="n-cliente_id"><option value="">— Selecione —</option></select>
+      <label>Cliente *</label>
+      <div class="search-select">
+        <input id="n-cliente_search" autocomplete="off" placeholder="Buscar cliente...">
+        <input type="hidden" id="n-cliente_id">
+      </div>
     </div>
     <div class="form-row">
       <div class="field"><label>Quantidade (t) *</label><input id="n-quantidade" type="number" step="0.01" placeholder="0.00"></div>
@@ -735,12 +760,18 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 <div class="modal-box">
   <div class="modal-head"><h3 id="pedido-modal-title">Novo Pedido</h3><button onclick="closeModal('modal-pedido')">✕</button></div>
   <div class="modal-body">
-    <div class="field"><label>Cliente *</label><select id="p-cliente_id"><option value="">— Selecione —</option></select></div>
-    <div class="field"><label>Produto</label><select id="p-produto"><option value="">— Selecione —</option></select></div>
-    <div class="form-row">
-      <div class="field"><label>Qtde Pedida (t) *</label><input id="p-qtde_pedida" type="number" step="0.01" placeholder="0.00"></div>
-      <div class="field"><label>Qtde Entregue (t)</label><input id="p-qtde_entregue" type="number" step="0.01" placeholder="0.00"></div>
+    <div class="field">
+      <label>Cliente *</label>
+      <div class="search-select">
+        <input id="p-cliente_search" autocomplete="off" placeholder="Buscar cliente...">
+        <input type="hidden" id="p-cliente_id">
+      </div>
     </div>
+
+    <div id="p-itens"></div>
+    <button type="button" class="btn btn-secondary btn-sm" id="p-add-item-btn" onclick="addPedidoItemRow()" style="margin-bottom:.9rem">+ Adicionar Produto</button>
+
+    <div class="field" id="p-entregue-wrap" hidden><label>Qtde Entregue (t)</label><input id="p-qtde_entregue" type="number" step="0.01" placeholder="0.00"></div>
     <div class="field"><label>Observação</label><textarea id="p-observacao" rows="2" placeholder="Opcional..."></textarea></div>
   </div>
   <div class="modal-foot">
@@ -804,7 +835,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
   <div class="modal-body">
     <div class="field"><label>Nome *</label><input id="cl-nome" placeholder="Ex: João da Silva"></div>
     <div class="form-row">
-      <div class="field"><label>CPF / CNPJ</label><input id="cl-cpf_cnpj" placeholder="000.000.000-00"></div>
+      <div class="field"><label>CPF / CNPJ *</label><input id="cl-cpf_cnpj" placeholder="000.000.000-00" required oninput="maskCpfCnpj(this)" maxlength="18"></div>
       <div class="field"><label>Telefone</label><input id="cl-telefone" placeholder="(16) 9 9999-9999"></div>
     </div>
     <div class="field"><label>E-mail</label><input id="cl-email" type="email" placeholder="cliente@email.com"></div>
@@ -926,7 +957,7 @@ async function loadDashboard() {
     const d = await req('GET', '/dashboard');
     // Stats
     document.getElementById('dash-stats').innerHTML = `
-      <div class="stat-card"><div class="label">Total Carregado</div><div class="value">${fmt(d.total_carregado)}</div><div class="sub">toneladas</div></div>
+      <div class="stat-card"><div class="label">Total Comprado</div><div class="value">${fmt(d.total_carregado)}</div><div class="sub">toneladas</div></div>
       <div class="stat-card yellow"><div class="label">Total Faturado</div><div class="value">${fmt(d.total_faturado)}</div><div class="sub">toneladas</div></div>
       <div class="stat-card brown"><div class="label">Saldo a Faturar</div><div class="value">${fmt(d.saldo_faturar)}</div><div class="sub">toneladas</div></div>
       <div class="stat-card blue"><div class="label">Pedidos em Aberto</div><div class="value">${d.pedidos_abertos}</div><div class="sub">aguardando entrega</div></div>
@@ -941,7 +972,7 @@ async function loadDashboard() {
       data: {
         labels: prods,
         datasets: [
-          { label: 'Carregado (t)', data: carrs, backgroundColor: '#c8ddca', borderRadius: 4 },
+          { label: 'Comprado (t)', data: carrs, backgroundColor: '#c8ddca', borderRadius: 4 },
           { label: 'Faturado (t)', data: fats, backgroundColor: '#1a5c38', borderRadius: 4 }
         ]
       },
@@ -953,7 +984,7 @@ async function loadDashboard() {
       const pct = Math.min((ent / ped) * 100, 100);
       return `<div style="margin-bottom:.7rem">
         <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.2rem">
-          <span>${p.cliente_nome || p.cliente_id || '—'} <span style="color:var(--muted)">(${p.produto || '—'})</span></span>
+          <span><strong>${p.numero_pedido || '—'}</strong> — ${p.clientes?.nome || p.cliente_id || '—'} <span style="color:var(--muted)">(${p.produto || '—'})</span></span>
           <span style="color:var(--muted)">${fmt(ent)}/${fmt(ped)} t</span>
         </div>
         <div class="prog"><div class="prog-fill${pct>=100?' done':''}" style="width:${pct}%"></div></div>
@@ -1178,8 +1209,9 @@ async function openNotaModal(preCarrId = null, preProduto = null) {
   prodSel.innerHTML = '<option value="">— Selecione —</option>' + S.produtos.map(p => `<option value="${p.nome}">${p.nome}</option>`).join('');
   prodSel.onchange = async () => { await updateCarrSelect(); updateSaldoHint(); };
 
-  // Populate clientes
-  populateSelectEl(document.getElementById('n-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
+  // Populate clientes (busca autocomplete)
+  document.getElementById('n-cliente_id').value = '';
+  createSearchSelect('n-cliente_search', 'n-cliente_id', S.clientes, 'nome', 'id');
 
   // Pré-selecionar produto e carregamento se informados
   if (preProduto) {
@@ -1277,9 +1309,9 @@ async function editNotaSF(sf) {
   prodSel.value = sf.produto || '';
   prodSel.onchange = async () => { await updateCarrSelect(); updateSaldoHint(); };
 
-  // Popula clientes
-  populateSelectEl(document.getElementById('n-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
+  // Popula clientes (busca autocomplete)
   document.getElementById('n-cliente_id').value = sf.cliente_id || '';
+  createSearchSelect('n-cliente_search', 'n-cliente_id', S.clientes, 'nome', 'id');
 
   // Popula carregamentos pelo produto atual (inclui o atual mesmo com saldo 0)
   await updateCarrSelect(sf.carregamento_id);
@@ -1290,6 +1322,7 @@ async function editNotaSF(sf) {
 }
 
 // ─── PEDIDOS ─────────────────────────────────────────────────────────────────
+// Cada pedido (numero_pedido) agrupa N itens (1 produto por item)
 async function loadPedidos() {
   try {
     S.pedidos = await req('GET', '/pedidos');
@@ -1299,57 +1332,173 @@ async function loadPedidos() {
 
 function renderPedidos() {
   const tb = document.querySelector('#pedido-tbl tbody');
-  if (!S.pedidos.length) { tb.innerHTML = `<tr><td colspan="7" class="tbl-empty">Nenhum pedido cadastrado.</td></tr>`; return; }
-  tb.innerHTML = S.pedidos.map(p => {
-    const ent = parseFloat(p.quantidade_entregue || 0), ped = parseFloat(p.quantidade_pedida);
-    const saldo = ped - ent;
-    const pct = ped > 0 ? Math.min((ent / ped) * 100, 100) : 0;
-    const cls = ent >= ped ? 'done' : pct >= 80 ? 'warn' : '';
-    return `<tr>
-      <td>${p.cliente_nome || '—'}</td>
-      <td>${p.produto || '—'}</td>
-      <td>${fmt(ped)}</td>
-      <td>${fmt(ent)}</td>
+  if (!S.pedidos.length) { tb.innerHTML = `<tr><td colspan="8" class="tbl-empty">Nenhum pedido cadastrado.</td></tr>`; return; }
+
+  let html = '';
+  S.pedidos.forEach((ped, idx) => {
+    const totalPed = ped.itens.reduce((s,it) => s + it.quantidade_pedida, 0);
+    const totalEnt = ped.itens.reduce((s,it) => s + it.quantidade_entregue, 0);
+    const saldo = totalPed - totalEnt;
+    const pct = totalPed > 0 ? Math.min((totalEnt / totalPed) * 100, 100) : 0;
+    const cls = totalEnt >= totalPed ? 'done' : pct >= 80 ? 'warn' : '';
+    const encerrado = ped.status === 'encerrado';
+    const rowId = 'ped-row-' + idx;
+    const idsJson = JSON.stringify(ped.itens.map(i => i.id));
+
+    html += `<tr class="ped-parent" onclick="togglePed('${rowId}')">
+      <td><span class="expand-icon" id="icon-${rowId}">▶</span><strong>${ped.numero_pedido || '—'}</strong></td>
+      <td>${ped.cliente_nome || '—'}</td>
+      <td style="font-size:.8rem;color:var(--muted)">${ped.itens.map(i=>i.produto).join(', ')}</td>
+      <td>${fmt(totalPed)}</td>
+      <td>${fmt(totalEnt)}</td>
       <td><strong ${saldo > 0 ? '' : 'style="color:var(--green-l)"'}>${fmt(saldo)}</strong></td>
       <td><div style="display:flex;align-items:center;gap:.5rem">
         <div class="prog" style="min-width:60px"><div class="prog-fill ${cls}" style="width:${pct}%"></div></div>
         <span style="font-size:.75rem;color:var(--muted);white-space:nowrap">${pct.toFixed(0)}%</span>
       </div></td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick='editPedido(${JSON.stringify(p)})'>✎</button>
-        <button class="btn btn-danger btn-sm" onclick='confirmDelete("pedido","${p.id}")'>🗑</button>
+      <td onclick="event.stopPropagation()">
+        ${encerrado
+          ? '<span class="badge badge-closed">Encerrado</span>'
+          : `<button class="btn btn-secondary btn-sm" onclick='encerrarPedido(${JSON.stringify(ped.numero_pedido)})'>✓ Encerrar</button>`}
+        <button class="btn btn-danger btn-sm" onclick='deletePedidoGrupo(${JSON.stringify(ped.numero_pedido)}, ${idsJson})'>🗑</button>
       </td>
     </tr>`;
-  }).join('');
+
+    html += `<tr class="ped-child-wrap" id="${rowId}" hidden><td colspan="8">`;
+    html += `<table class="sf-inner-tbl"><thead><tr>
+      <th class="sf-child-indent">↳ Produto</th><th>Pedido (t)</th><th>Entregue (t)</th><th>Saldo (t)</th><th>Progresso</th><th></th>
+    </tr></thead><tbody>`;
+    ped.itens.forEach(it => {
+      const s = it.quantidade_pedida - it.quantidade_entregue;
+      const p2 = it.quantidade_pedida > 0 ? Math.min((it.quantidade_entregue / it.quantidade_pedida) * 100, 100) : 0;
+      html += `<tr>
+        <td class="sf-child-indent">${it.produto}</td>
+        <td>${fmt(it.quantidade_pedida)}</td>
+        <td>${fmt(it.quantidade_entregue)}</td>
+        <td>${fmt(s)}</td>
+        <td><div class="prog" style="min-width:60px;display:inline-block;vertical-align:middle"><div class="prog-fill" style="width:${p2}%"></div></div></td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick='editPedidoItem(${JSON.stringify(it)}, ${JSON.stringify({numero_pedido:ped.numero_pedido,cliente_id:ped.cliente_id,observacao:ped.observacao})})'>✎</button>
+          <button class="btn btn-danger btn-sm" onclick='confirmDelete("pedido","${it.id}")'>🗑</button>
+        </td>
+      </tr>`;
+    });
+    if (ped.observacao) html += `<tr><td colspan="6" style="padding:.5rem 2rem;font-size:.8rem;color:var(--muted)">Obs: ${ped.observacao}</td></tr>`;
+    html += `</tbody></table></td></tr>`;
+  });
+
+  tb.innerHTML = html;
 }
 
-function openPedidoModal(p = null) {
-  S.editId = p?.id || null; S.editType = 'pedido';
-  document.getElementById('pedido-modal-title').textContent = p ? 'Editar Pedido' : 'Novo Pedido';
-  populateSelectEl(document.getElementById('p-cliente_id'), S.clientes, 'id', 'nome', '— Selecione —');
-  const prodSel = document.getElementById('p-produto');
-  prodSel.innerHTML = '<option value="">— Selecione —</option>' + S.produtos.map(pr => `<option value="${pr.nome}">${pr.nome}</option>`).join('');
-  document.getElementById('p-cliente_id').value = p?.cliente_id || '';
-  document.getElementById('p-produto').value = p?.produto || '';
-  document.getElementById('p-qtde_pedida').value = p?.quantidade_pedida || '';
-  document.getElementById('p-qtde_entregue').value = p?.quantidade_entregue || 0;
-  document.getElementById('p-observacao').value = p?.observacao || '';
+function togglePed(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const icon = document.getElementById('icon-' + id);
+  row.hidden = !row.hidden;
+  if (icon) icon.classList.toggle('open', !row.hidden);
+}
+
+function pedidoItemRowHtml(produto = '', qtde = '') {
+  const options = '<option value="">— Produto —</option>' + S.produtos.map(p =>
+    `<option value="${p.nome}"${p.nome === produto ? ' selected' : ''}>${p.nome}</option>`
+  ).join('');
+  return `<div class="pedido-item-row" data-row>
+    <select class="pi-produto">${options}</select>
+    <input class="pi-qtde" type="number" step="0.01" placeholder="Qtde (t)" value="${qtde}">
+    <button type="button" class="btn btn-danger btn-sm" onclick="removePedidoItemRow(this)">✕</button>
+  </div>`;
+}
+
+function addPedidoItemRow(produto = '', qtde = '') {
+  document.getElementById('p-itens').insertAdjacentHTML('beforeend', pedidoItemRowHtml(produto, qtde));
+  updatePedidoRemoveButtons();
+}
+
+function removePedidoItemRow(btn) {
+  const rows = document.querySelectorAll('#p-itens [data-row]');
+  if (rows.length <= 1) return;
+  btn.closest('[data-row]').remove();
+  updatePedidoRemoveButtons();
+}
+
+function updatePedidoRemoveButtons() {
+  const rows = document.querySelectorAll('#p-itens [data-row]');
+  rows.forEach(r => { r.querySelector('button').style.visibility = rows.length > 1 ? 'visible' : 'hidden'; });
+}
+
+function openPedidoModal() {
+  S.editId = null; S.editType = 'pedido';
+  document.getElementById('pedido-modal-title').textContent = 'Novo Pedido';
+  document.getElementById('p-cliente_id').value = '';
+  createSearchSelect('p-cliente_search', 'p-cliente_id', S.clientes, 'nome', 'id');
+  document.getElementById('p-itens').innerHTML = '';
+  addPedidoItemRow();
+  document.getElementById('p-add-item-btn').hidden = false;
+  document.getElementById('p-entregue-wrap').hidden = true;
+  document.getElementById('p-observacao').value = '';
   openModal('modal-pedido');
 }
 
-function editPedido(p) { openPedidoModal(p); }
+// Edita um único item (produto) dentro de um pedido já existente
+function editPedidoItem(item, ped) {
+  S.editId = item.id; S.editType = 'pedido';
+  document.getElementById('pedido-modal-title').textContent = `Editar Item — ${ped.numero_pedido || ''}`;
+  document.getElementById('p-cliente_id').value = ped.cliente_id;
+  createSearchSelect('p-cliente_search', 'p-cliente_id', S.clientes, 'nome', 'id');
+  document.getElementById('p-itens').innerHTML = '';
+  addPedidoItemRow(item.produto, item.quantidade_pedida);
+  document.getElementById('p-add-item-btn').hidden = true;
+  updatePedidoRemoveButtons();
+  document.querySelectorAll('#p-itens [data-row] button').forEach(b => b.style.visibility = 'hidden');
+  document.getElementById('p-entregue-wrap').hidden = false;
+  document.getElementById('p-qtde_entregue').value = item.quantidade_entregue || 0;
+  document.getElementById('p-observacao').value = ped.observacao || '';
+  openModal('modal-pedido');
+}
 
 async function submitPedido() {
-  const d = {
-    cliente_id: v('p-cliente_id'), produto: v('p-produto'),
-    quantidade_pedida: v('p-qtde_pedida'), quantidade_entregue: v('p-qtde_entregue'),
-    observacao: v('p-observacao')
-  };
+  const cliente_id = v('p-cliente_id');
+  if (!cliente_id) { toast('Selecione um cliente', 'err'); return; }
+  const itens = [...document.querySelectorAll('#p-itens [data-row]')].map(r => ({
+    produto: r.querySelector('.pi-produto').value,
+    quantidade_pedida: r.querySelector('.pi-qtde').value
+  }));
+  if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida)) {
+    toast('Informe ao menos um produto com quantidade pedida', 'err'); return;
+  }
   try {
-    if (S.editId) await req('PUT', '/pedidos/' + S.editId, d);
-    else await req('POST', '/pedidos', d);
+    if (S.editId) {
+      await req('PUT', '/pedidos/' + S.editId, {
+        cliente_id, produto: itens[0].produto, quantidade_pedida: itens[0].quantidade_pedida,
+        quantidade_entregue: v('p-qtde_entregue') || 0, observacao: v('p-observacao')
+      });
+    } else {
+      await req('POST', '/pedidos', { cliente_id, observacao: v('p-observacao'), itens });
+    }
     closeModal('modal-pedido'); toast('Pedido salvo!'); loadPedidos();
   } catch(e) { toast(e.message, 'err'); }
+}
+
+function encerrarPedido(numero_pedido) {
+  document.getElementById('confirm-msg').textContent = `Encerrar pedido ${numero_pedido}? O saldo restante será dado como finalizado.`;
+  document.getElementById('confirm-ok-btn').onclick = async () => {
+    try {
+      await req('POST', `/pedidos/${encodeURIComponent(numero_pedido)}/encerrar`);
+      closeModal('confirm-modal'); toast('Pedido encerrado!'); loadPedidos();
+    } catch(e) { toast(e.message, 'err'); }
+  };
+  openModal('confirm-modal');
+}
+
+function deletePedidoGrupo(numero_pedido, ids) {
+  document.getElementById('confirm-msg').textContent = `Excluir o pedido ${numero_pedido} e todos os seus ${ids.length} item(ns)?`;
+  document.getElementById('confirm-ok-btn').onclick = async () => {
+    try {
+      await Promise.all(ids.map(id => req('DELETE', '/pedidos/' + id)));
+      closeModal('confirm-modal'); toast('Pedido excluído!'); loadPedidos();
+    } catch(e) { toast(e.message, 'err'); }
+  };
+  openModal('confirm-modal');
 }
 
 // ─── CADASTROS ────────────────────────────────────────────────────────────────
@@ -1528,13 +1677,63 @@ function populateSelect(id, arr, valKey, labelKey, emptyLabel = null) {
   if (cur) sel.value = cur;
 }
 
-function populateSelectEl(sel, arr, valKey, labelKey, emptyLabel) {
-  sel.innerHTML = (emptyLabel ? `<option value="">${emptyLabel}</option>` : '') +
-    arr.map(i => `<option value="${i[valKey]}">${i[labelKey]}</option>`).join('');
-}
-
 function openModal(id) { document.getElementById(id).hidden = false; }
 function closeModal(id) { document.getElementById(id).hidden = true; }
+
+function maskCpfCnpj(el) {
+  let v = el.value.replace(/\D/g, '').slice(0, 14);
+  if (v.length <= 11) {
+    v = v.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+  } else {
+    v = v.replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+  }
+  el.value = v;
+}
+
+// ─── BUSCA AUTOCOMPLETE (search-select reutilizável) ──────────────────────────
+// Fecha qualquer dropdown aberto ao clicar fora dele
+document.addEventListener('click', e => {
+  document.querySelectorAll('.search-dropdown').forEach(dd => {
+    if (!dd.hidden && !dd.contains(e.target) && dd.previousElementSibling !== e.target) dd.hidden = true;
+  });
+});
+
+function createSearchSelect(inputId, hiddenId, items, labelKey, valueKey) {
+  const input = document.getElementById(inputId);
+  const hidden = document.getElementById(hiddenId);
+  if (!input || !hidden) return;
+
+  let dropdown = document.getElementById(inputId + '-dropdown');
+  if (!dropdown) {
+    dropdown = document.createElement('div');
+    dropdown.className = 'search-dropdown';
+    dropdown.id = inputId + '-dropdown';
+    dropdown.hidden = true;
+    input.insertAdjacentElement('afterend', dropdown);
+  }
+
+  const findLabel = val => items.find(i => String(i[valueKey]) === String(val))?.[labelKey] || '';
+
+  function renderOptions(filter) {
+    const f = (filter || '').toLowerCase();
+    const filtered = items.filter(it => String(it[labelKey] || '').toLowerCase().includes(f));
+    dropdown.innerHTML = filtered.length
+      ? filtered.slice(0, 50).map(it => `<div class="opt" data-value="${it[valueKey]}">${it[labelKey]}</div>`).join('')
+      : `<div class="empty">Nenhum resultado</div>`;
+    dropdown.hidden = false;
+  }
+
+  input.value = findLabel(hidden.value);
+  input.oninput = () => { hidden.value = ''; renderOptions(input.value); };
+  input.onfocus = () => renderOptions(input.value);
+  dropdown.onclick = e => {
+    const opt = e.target.closest('.opt');
+    if (!opt) return;
+    hidden.value = opt.dataset.value;
+    input.value = opt.textContent;
+    dropdown.hidden = true;
+  };
+}
 
 function toast(msg, type = 'ok') {
   const icons = { ok: '✓', err: '✗', warn: '⚠' };
@@ -1588,10 +1787,10 @@ async function initRelFiltros() {
   const cv = document.getElementById('r-cliente')?.value;
   populateSelect('r-produto', S.produtos, 'nome', 'nome', 'Todos os produtos');
   populateSelect('r-fornecedor', S.fornecedores, 'id', 'nome', 'Todos os fornecedores');
-  populateSelectEl(document.getElementById('r-cliente'), S.clientes, 'id', 'nome', 'Todos os clientes');
   if (pv) document.getElementById('r-produto').value = pv;
   if (fv) document.getElementById('r-fornecedor').value = fv;
-  if (cv) document.getElementById('r-cliente').value = cv;
+  document.getElementById('r-cliente').value = cv || '';
+  createSearchSelect('r-cliente_search', 'r-cliente', [{ id: '', nome: 'Todos os clientes' }, ...S.clientes], 'nome', 'id');
 }
 
 async function gerarRelatorio() {
@@ -1647,11 +1846,11 @@ function renderRelProduto() {
     data: {
       labels: prods,
       datasets: [
-        { label: 'Carregado (t)', data: prods.map(p=>d[p].carregado), backgroundColor: '#c8ddca', borderRadius:4 },
+        { label: 'Comprado (t)', data: prods.map(p=>d[p].carregado), backgroundColor: '#c8ddca', borderRadius:4 },
         { label: 'Faturado (t)', data: prods.map(p=>d[p].faturado), backgroundColor: '#1a5c38', borderRadius:4 }
       ]
     },
-    options: { responsive:true, plugins:{ title:{ display:true, text:'Carregado vs Faturado por Produto' }, legend:{position:'bottom'} }, scales:{ y:{beginAtZero:true} } }
+    options: { responsive:true, plugins:{ title:{ display:true, text:'Comprado vs Faturado por Produto' }, legend:{position:'bottom'} }, scales:{ y:{beginAtZero:true} } }
   });
 
   relCharts['rel-chart-valor'] = new Chart(document.getElementById('rel-chart-valor'), {
@@ -1756,7 +1955,7 @@ function exportRelatorio() {
     filename = 'rel_clientes.csv';
   } else {
     const d = relData.resumo?.por_produto||{};
-    headers = ['Produto','Carregado(t)','Faturado(t)','Saldo(t)','% Faturado','Valor(R$)'];
+    headers = ['Produto','Comprado(t)','Faturado(t)','Saldo(t)','% Faturado','Valor(R$)'];
     rows = Object.entries(d).map(([p,r])=>[p,r.carregado.toFixed(2),r.faturado.toFixed(2),r.saldo.toFixed(2),(r.carregado>0?r.faturado/r.carregado*100:0).toFixed(1)+'%',r.valor.toFixed(2)]);
     filename = 'rel_por_produto.csv';
   }
