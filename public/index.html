@@ -236,11 +236,14 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 .search-dropdown .opt:hover{background:var(--green-xl)}
 .search-dropdown .empty{padding:.6rem .9rem;font-size:.8rem;color:var(--muted)}
 
-/* Linhas de item do pedido (multi-produto) */
-.pedido-item-row{display:flex;gap:.5rem;margin-bottom:.6rem;align-items:center}
-.pedido-item-row select{flex:1.6}
-.pedido-item-row input{flex:1}
-.pedido-item-row .btn{flex-shrink:0}
+/* Linhas de item do pedido (multi-produto + campos comerciais) */
+.pedido-item-row{border:1.5px solid var(--border);border-radius:var(--r-sm);padding:.7rem .8rem .6rem;margin-bottom:.7rem;position:relative;background:#fbfdfb}
+.pedido-item-row select,.pedido-item-row input{width:100%;padding:.5rem .7rem;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem;margin-bottom:.5rem;background:#fff;color:var(--text)}
+.pedido-item-row select:focus,.pedido-item-row input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(26,92,56,.08)}
+.pedido-item-row .pi-grid2{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.pedido-item-row .pi-grid2 select,.pedido-item-row .pi-grid2 input{margin-bottom:0}
+.pedido-item-row .pi-total{background:var(--green-xl)!important;font-weight:600;color:var(--green-d);cursor:default;margin-bottom:0}
+.pedido-item-row .pi-remove-btn{position:absolute;top:.5rem;right:.5rem;padding:.15rem .45rem;font-size:.7rem}
 
 /* Hierarquia de pedidos (agrupado por numero_pedido) */
 .ped-parent{cursor:pointer}
@@ -639,6 +642,8 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         <button class="tab active" onclick="switchTab('produtos')">🌾 Produtos</button>
         <button class="tab" onclick="switchTab('fornecedores')">🚚 Fornecedores</button>
         <button class="tab" onclick="switchTab('clientes')">👤 Clientes</button>
+        <button class="tab" onclick="switchTab('embalagens')">📦 Embalagens</button>
+        <button class="tab" onclick="switchTab('prazos')">💳 Prazos Pgto</button>
       </div>
 
       <!-- Produtos -->
@@ -678,6 +683,34 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         <div class="tbl-wrap">
           <table id="cli-tbl">
             <thead><tr><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>Cidade/UF</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Embalagens -->
+      <div id="tab-embalagens" hidden>
+        <div class="section-header" style="margin-bottom:.8rem">
+          <span style="flex:1;font-size:.85rem;color:var(--muted)">Tipos de embalagem usados nos pedidos</span>
+          <button class="btn btn-primary btn-sm" onclick="openEmbModal()">+ Embalagem</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="emb-tbl">
+            <thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Prazos de Pagamento -->
+      <div id="tab-prazos" hidden>
+        <div class="section-header" style="margin-bottom:.8rem">
+          <span style="flex:1;font-size:.85rem;color:var(--muted)">Condições de pagamento usadas nos pedidos</span>
+          <button class="btn btn-primary btn-sm" onclick="openPrazoModal()">+ Prazo</button>
+        </div>
+        <div class="tbl-wrap">
+          <table id="prazo-tbl">
+            <thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -778,7 +811,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 
 <!-- Modal Pedido -->
 <div class="modal-bg" id="modal-pedido" hidden>
-<div class="modal-box">
+<div class="modal-box" style="max-width:620px">
   <div class="modal-head"><h3 id="pedido-modal-title">Novo Pedido</h3><button onclick="closeModal('modal-pedido')">✕</button></div>
   <div class="modal-body">
     <div class="field">
@@ -822,6 +855,36 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeModal('modal-prod')">Cancelar</button>
     <button class="btn btn-primary" onclick="submitProd()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Embalagem -->
+<div class="modal-bg" id="modal-emb" hidden>
+<div class="modal-box" style="max-width:400px">
+  <div class="modal-head"><h3 id="emb-modal-title">Nova Embalagem</h3><button onclick="closeModal('modal-emb')">✕</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Nome *</label><input id="emb-nome" placeholder="Ex: Big Bag 1t"></div>
+    <div class="field"><label>Descrição</label><textarea id="emb-descricao" rows="2" placeholder="Descrição opcional"></textarea></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-emb')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitEmb()">Salvar</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal Prazo de Pagamento -->
+<div class="modal-bg" id="modal-prazo" hidden>
+<div class="modal-box" style="max-width:400px">
+  <div class="modal-head"><h3 id="prazo-modal-title">Novo Prazo de Pagamento</h3><button onclick="closeModal('modal-prazo')">✕</button></div>
+  <div class="modal-body">
+    <div class="field"><label>Nome *</label><input id="prazo-nome" placeholder="Ex: 30/60/90 dias"></div>
+    <div class="field"><label>Descrição</label><textarea id="prazo-descricao" rows="2" placeholder="Descrição opcional"></textarea></div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-prazo')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitPrazo()">Salvar</button>
   </div>
 </div>
 </div>
@@ -916,6 +979,7 @@ const S = {
   token: localStorage.getItem('ibiata_token'),
   user: null,
   produtos: [], fornecedores: [], clientes: [],
+  embalagens: [], prazos: [],
   carregamentos: [], notas: [], pedidos: [],
   editId: null, editType: null,
   dashChart: null
@@ -988,8 +1052,9 @@ async function showApp() {
   document.getElementById('user-badge').textContent = email.split('@')[0] || 'Usuário';
   // Load lookup data
   try {
-    [S.produtos, S.fornecedores, S.clientes] = await Promise.all([
-      req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes')
+    [S.produtos, S.fornecedores, S.clientes, S.embalagens, S.prazos] = await Promise.all([
+      req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes'),
+      req('GET', '/embalagens'), req('GET', '/prazos-pagamento')
     ]);
   } catch(e) { toast('Erro ao carregar cadastros: ' + e.message, 'err'); }
   await loadDashboard();
@@ -1410,7 +1475,9 @@ function renderPedidos() {
 
     html += `<tr class="ped-child-wrap" id="${rowId}" hidden><td colspan="8">`;
     html += `<table class="sf-inner-tbl"><thead><tr>
-      <th class="sf-child-indent">↳ Produto</th><th>Pedido (t)</th><th>Entregue (t)</th><th>Saldo (t)</th><th>Progresso</th><th></th>
+      <th class="sf-child-indent">↳ Produto</th><th>Pedido (t)</th><th>Entregue (t)</th><th>Saldo (t)</th>
+      <th>Embalagem</th><th>R$/t</th><th>Total R$</th><th>Prazo Pgto</th>
+      <th>Progresso</th><th></th>
     </tr></thead><tbody>`;
     ped.itens.forEach(it => {
       const s = it.quantidade_pedida - it.quantidade_entregue;
@@ -1420,6 +1487,10 @@ function renderPedidos() {
         <td>${fmt(it.quantidade_pedida)}</td>
         <td>${fmt(it.quantidade_entregue)}</td>
         <td>${fmt(s)}</td>
+        <td style="font-size:.8rem">${it.embalagem_nome || '—'}</td>
+        <td>${it.preco_unitario ? fmtMoney(it.preco_unitario) : '—'}</td>
+        <td><strong>${it.total_venda ? fmtMoney(it.total_venda) : '—'}</strong></td>
+        <td style="font-size:.8rem">${it.prazo_pagamento_nome || '—'}</td>
         <td><div class="prog" style="min-width:60px;display:inline-block;vertical-align:middle"><div class="prog-fill" style="width:${p2}%"></div></div></td>
         <td>
           <button class="btn btn-secondary btn-sm" onclick='editPedidoItem(${JSON.stringify(it)}, ${JSON.stringify({numero_pedido:ped.numero_pedido,cliente_id:ped.cliente_id,observacao:ped.observacao})})'>✎</button>
@@ -1427,7 +1498,7 @@ function renderPedidos() {
         </td>
       </tr>`;
     });
-    if (ped.observacao) html += `<tr><td colspan="6" style="padding:.5rem 2rem;font-size:.8rem;color:var(--muted)">Obs: ${ped.observacao}</td></tr>`;
+    if (ped.observacao) html += `<tr><td colspan="10" style="padding:.5rem 2rem;font-size:.8rem;color:var(--muted)">Obs: ${ped.observacao}</td></tr>`;
     html += `</tbody></table></td></tr>`;
   });
 
@@ -1442,19 +1513,41 @@ function togglePed(id) {
   if (icon) icon.classList.toggle('open', !row.hidden);
 }
 
-function pedidoItemRowHtml(produto = '', qtde = '') {
-  const options = '<option value="">— Produto —</option>' + S.produtos.map(p =>
+function pedidoItemRowHtml(produto = '', qtde = '', embalagem_id = '', preco = '', prazo_pagamento_id = '') {
+  const prodOptions = '<option value="">— Produto —</option>' + S.produtos.map(p =>
     `<option value="${p.nome}"${p.nome === produto ? ' selected' : ''}>${p.nome}</option>`
   ).join('');
+  const embOptions = '<option value="">Embalagem</option>' + S.embalagens.map(e =>
+    `<option value="${e.id}"${e.id === embalagem_id ? ' selected' : ''}>${e.nome}</option>`
+  ).join('');
+  const prazoOptions = '<option value="">Prazo</option>' + S.prazos.map(pz =>
+    `<option value="${pz.id}"${pz.id === prazo_pagamento_id ? ' selected' : ''}>${pz.nome}</option>`
+  ).join('');
+  const totalInicial = qtde && preco ? fmtMoney(parseFloat(qtde) * parseFloat(preco)) : '';
   return `<div class="pedido-item-row" data-row>
-    <select class="pi-produto">${options}</select>
-    <input class="pi-qtde" type="number" step="0.01" placeholder="Qtde (t)" value="${qtde}">
-    <button type="button" class="btn btn-danger btn-sm" onclick="removePedidoItemRow(this)">✕</button>
+    <button type="button" class="btn btn-danger btn-sm pi-remove-btn" onclick="removePedidoItemRow(this)">✕</button>
+    <select class="pi-produto">${prodOptions}</select>
+    <div class="pi-grid2">
+      <input class="pi-qtde" type="number" step="0.01" placeholder="Qtde (t)" value="${qtde}" oninput="calcItemTotal(this)">
+      <select class="pi-embalagem">${embOptions}</select>
+    </div>
+    <div class="pi-grid2">
+      <input class="pi-preco" type="number" step="0.01" placeholder="R$/t" value="${preco}" oninput="calcItemTotal(this)">
+      <select class="pi-prazo">${prazoOptions}</select>
+    </div>
+    <input class="pi-total" type="text" readonly placeholder="Total R$" value="${totalInicial}">
   </div>`;
 }
 
-function addPedidoItemRow(produto = '', qtde = '') {
-  document.getElementById('p-itens').insertAdjacentHTML('beforeend', pedidoItemRowHtml(produto, qtde));
+function calcItemTotal(el) {
+  const row = el.closest('.pedido-item-row');
+  const qtde = parseFloat(row.querySelector('.pi-qtde').value) || 0;
+  const preco = parseFloat(row.querySelector('.pi-preco').value) || 0;
+  row.querySelector('.pi-total').value = qtde && preco ? fmtMoney(qtde * preco) : '';
+}
+
+function addPedidoItemRow(produto = '', qtde = '', embalagem_id = '', preco = '', prazo_pagamento_id = '') {
+  document.getElementById('p-itens').insertAdjacentHTML('beforeend', pedidoItemRowHtml(produto, qtde, embalagem_id, preco, prazo_pagamento_id));
   updatePedidoRemoveButtons();
 }
 
@@ -1490,7 +1583,7 @@ function editPedidoItem(item, ped) {
   document.getElementById('p-cliente_id').value = ped.cliente_id;
   createSearchSelect('p-cliente_search', 'p-cliente_id', S.clientes, 'nome', 'id');
   document.getElementById('p-itens').innerHTML = '';
-  addPedidoItemRow(item.produto, item.quantidade_pedida);
+  addPedidoItemRow(item.produto, item.quantidade_pedida, item.embalagem_id || '', item.preco_unitario || '', item.prazo_pagamento_id || '');
   document.getElementById('p-add-item-btn').hidden = true;
   updatePedidoRemoveButtons();
   document.querySelectorAll('#p-itens [data-row] button').forEach(b => b.style.visibility = 'hidden');
@@ -1505,7 +1598,10 @@ async function submitPedido() {
   if (!cliente_id) { toast('Selecione um cliente', 'err'); return; }
   const itens = [...document.querySelectorAll('#p-itens [data-row]')].map(r => ({
     produto: r.querySelector('.pi-produto').value,
-    quantidade_pedida: r.querySelector('.pi-qtde').value
+    quantidade_pedida: r.querySelector('.pi-qtde').value,
+    embalagem_id: r.querySelector('.pi-embalagem').value || null,
+    preco_unitario: r.querySelector('.pi-preco').value || 0,
+    prazo_pagamento_id: r.querySelector('.pi-prazo').value || null
   }));
   if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida)) {
     toast('Informe ao menos um produto com quantidade pedida', 'err'); return;
@@ -1514,7 +1610,8 @@ async function submitPedido() {
     if (S.editId) {
       await req('PUT', '/pedidos/' + S.editId, {
         cliente_id, produto: itens[0].produto, quantidade_pedida: itens[0].quantidade_pedida,
-        quantidade_entregue: v('p-qtde_entregue') || 0, observacao: v('p-observacao')
+        quantidade_entregue: v('p-qtde_entregue') || 0, observacao: v('p-observacao'),
+        embalagem_id: itens[0].embalagem_id, preco_unitario: itens[0].preco_unitario, prazo_pagamento_id: itens[0].prazo_pagamento_id
       });
     } else {
       await req('POST', '/pedidos', { cliente_id, observacao: v('p-observacao'), itens });
@@ -1548,11 +1645,11 @@ function deletePedidoGrupo(numero_pedido, ids) {
 // ─── CADASTROS ────────────────────────────────────────────────────────────────
 async function loadCadastros() {
   try {
-    [S.produtos, S.fornecedores, S.clientes] = await Promise.all([
-      req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes')
+    [S.produtos, S.fornecedores, S.clientes, S.embalagens, S.prazos] = await Promise.all([
+      req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes'),
+      req('GET', '/embalagens'), req('GET', '/prazos-pagamento')
     ]);
-    console.log('[cadastros] produtos:', S.produtos.length, S.produtos);
-    renderProd(); renderForn(); renderCli();
+    renderProd(); renderForn(); renderCli(); renderEmb(); renderPrazo();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
 
@@ -1591,12 +1688,35 @@ function renderCli() {
   </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum cliente cadastrado.</td></tr>`;
 }
 
+function renderEmb() {
+  const tb = document.querySelector('#emb-tbl tbody');
+  tb.innerHTML = S.embalagens.length ? S.embalagens.map(e => `<tr>
+    <td><strong>${e.nome}</strong></td><td>${e.descricao || '—'}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick='editEmb(${JSON.stringify(e)})'>✎</button>
+      <button class="btn btn-danger btn-sm" onclick='confirmDelete("embalagem","${e.id}")'>🗑</button>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="3" class="tbl-empty">Nenhuma embalagem cadastrada.</td></tr>`;
+}
+
+function renderPrazo() {
+  const tb = document.querySelector('#prazo-tbl tbody');
+  tb.innerHTML = S.prazos.length ? S.prazos.map(p => `<tr>
+    <td><strong>${p.nome}</strong></td><td>${p.descricao || '—'}</td>
+    <td>
+      <button class="btn btn-secondary btn-sm" onclick='editPrazo(${JSON.stringify(p)})'>✎</button>
+      <button class="btn btn-danger btn-sm" onclick='confirmDelete("prazo","${p.id}")'>🗑</button>
+    </td>
+  </tr>`).join('') : `<tr><td colspan="3" class="tbl-empty">Nenhum prazo cadastrado.</td></tr>`;
+}
+
+const CADASTRO_TABS = ['produtos','fornecedores','clientes','embalagens','prazos'];
 function switchTab(t) {
-  ['produtos','fornecedores','clientes'].forEach(tab => {
+  CADASTRO_TABS.forEach(tab => {
     document.getElementById('tab-'+tab).hidden = tab !== t;
   });
-  document.querySelectorAll('.tabs .tab').forEach((btn, i) => {
-    btn.classList.toggle('active', ['produtos','fornecedores','clientes'][i] === t);
+  document.querySelectorAll('#sec-cadastros .tabs .tab').forEach((btn, i) => {
+    btn.classList.toggle('active', CADASTRO_TABS[i] === t);
   });
 }
 
@@ -1616,6 +1736,42 @@ async function submitProd() {
     if (S.editId) await req('PUT', '/produtos/' + S.editId, d);
     else await req('POST', '/produtos', d);
     closeModal('modal-prod'); toast('Produto salvo!'); loadCadastros();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// Embalagem modal
+function openEmbModal(e = null) {
+  S.editId = e?.id || null;
+  document.getElementById('emb-modal-title').textContent = e ? 'Editar Embalagem' : 'Nova Embalagem';
+  document.getElementById('emb-nome').value = e?.nome || '';
+  document.getElementById('emb-descricao').value = e?.descricao || '';
+  openModal('modal-emb');
+}
+function editEmb(e) { openEmbModal(e); }
+async function submitEmb() {
+  const d = { nome: v('emb-nome'), descricao: v('emb-descricao') };
+  try {
+    if (S.editId) await req('PUT', '/embalagens/' + S.editId, d);
+    else await req('POST', '/embalagens', d);
+    closeModal('modal-emb'); toast('Embalagem salva!'); loadCadastros();
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// Prazo de pagamento modal
+function openPrazoModal(p = null) {
+  S.editId = p?.id || null;
+  document.getElementById('prazo-modal-title').textContent = p ? 'Editar Prazo de Pagamento' : 'Novo Prazo de Pagamento';
+  document.getElementById('prazo-nome').value = p?.nome || '';
+  document.getElementById('prazo-descricao').value = p?.descricao || '';
+  openModal('modal-prazo');
+}
+function editPrazo(p) { openPrazoModal(p); }
+async function submitPrazo() {
+  const d = { nome: v('prazo-nome'), descricao: v('prazo-descricao') };
+  try {
+    if (S.editId) await req('PUT', '/prazos-pagamento/' + S.editId, d);
+    else await req('POST', '/prazos-pagamento', d);
+    closeModal('modal-prazo'); toast('Prazo de pagamento salvo!'); loadCadastros();
   } catch(e) { toast(e.message, 'err'); }
 }
 
@@ -1732,12 +1888,14 @@ function confirmDelete(type, id) {
     pedido: 'Excluir este pedido?',
     produto: 'Excluir este produto?',
     fornecedor: 'Excluir este fornecedor?',
-    cliente: 'Excluir este cliente?'
+    cliente: 'Excluir este cliente?',
+    embalagem: 'Excluir esta embalagem?',
+    prazo: 'Excluir este prazo de pagamento?'
   };
   document.getElementById('confirm-msg').textContent = msgs[type] || 'Confirmar exclusão?';
   document.getElementById('confirm-ok-btn').onclick = async () => {
     try {
-      const paths = { carregamento:'/carregamentos/', nota:'/notas-sf/', pedido:'/pedidos/', produto:'/produtos/', fornecedor:'/fornecedores/', cliente:'/clientes/' };
+      const paths = { carregamento:'/carregamentos/', nota:'/notas-sf/', pedido:'/pedidos/', produto:'/produtos/', fornecedor:'/fornecedores/', cliente:'/clientes/', embalagem:'/embalagens/', prazo:'/prazos-pagamento/' };
       await req('DELETE', paths[type] + id);
       closeModal('confirm-modal'); toast('Excluído com sucesso!');
       const reloaders = {
@@ -1746,7 +1904,9 @@ function confirmDelete(type, id) {
         pedido: loadPedidos,
         produto: loadCadastros,
         fornecedor: loadCadastros,
-        cliente: loadCadastros
+        cliente: loadCadastros,
+        embalagem: loadCadastros,
+        prazo: loadCadastros
       };
       reloaders[type]?.();
     } catch(e) { toast(e.message, 'err'); }

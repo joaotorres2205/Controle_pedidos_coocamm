@@ -374,6 +374,60 @@ app.delete('/api/clientes/:id', requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── EMBALAGENS ───────────────────────────────────────────────────────────────
+app.get('/api/embalagens', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('embalagens').select('*').order('nome');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+app.post('/api/embalagens', requireAuth, async (req, res) => {
+  const nome = clean(req.body.nome);
+  if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
+  const { data, error } = await supabase.from('embalagens').insert([{ nome, descricao: clean(req.body.descricao) }]).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+app.put('/api/embalagens/:id', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('embalagens').update({ nome: clean(req.body.nome), descricao: clean(req.body.descricao) }).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+app.delete('/api/embalagens/:id', requireAuth, async (req, res) => {
+  const { error } = await supabase.from('embalagens').delete().eq('id', req.params.id);
+  if (error) {
+    if (error.code === '23503') return res.status(400).json({ error: 'Esta embalagem está em uso em um ou mais pedidos e não pode ser excluída.' });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ ok: true });
+});
+
+// ─── PRAZOS DE PAGAMENTO ──────────────────────────────────────────────────────
+app.get('/api/prazos-pagamento', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('prazos_pagamento').select('*').order('nome');
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+app.post('/api/prazos-pagamento', requireAuth, async (req, res) => {
+  const nome = clean(req.body.nome);
+  if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
+  const { data, error } = await supabase.from('prazos_pagamento').insert([{ nome, descricao: clean(req.body.descricao) }]).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+app.put('/api/prazos-pagamento/:id', requireAuth, async (req, res) => {
+  const { data, error } = await supabase.from('prazos_pagamento').update({ nome: clean(req.body.nome), descricao: clean(req.body.descricao) }).eq('id', req.params.id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+app.delete('/api/prazos-pagamento/:id', requireAuth, async (req, res) => {
+  const { error } = await supabase.from('prazos_pagamento').delete().eq('id', req.params.id);
+  if (error) {
+    if (error.code === '23503') return res.status(400).json({ error: 'Este prazo de pagamento está em uso em um ou mais pedidos e não pode ser excluído.' });
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ ok: true });
+});
+
 // ─── CARREGAMENTOS ────────────────────────────────────────────────────────────
 app.get('/api/carregamentos', requireAuth, async (req, res) => {
   try {
@@ -507,7 +561,7 @@ app.delete('/api/notas-sf/:id', requireAuth, async (req, res) => {
 // Cada linha da tabela = 1 produto. N linhas com o mesmo numero_pedido formam 1 pedido.
 app.get('/api/pedidos', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('pedidos').select('*, clientes(nome)').order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('pedidos').select('*, clientes(nome), embalagens(nome), prazos_pagamento(nome)').order('created_at', { ascending: false });
     if (error) throw error;
 
     const grupos = {};
@@ -522,11 +576,17 @@ app.get('/api/pedidos', requireAuth, async (req, res) => {
         };
         ordem.push(chave);
       }
+      const preco = parseFloat(p.preco_unitario || 0);
+      const qtdePedida = parseFloat(p.quantidade_pedida);
       grupos[chave].itens.push({
         id: p.id, produto: p.produto,
-        quantidade_pedida: parseFloat(p.quantidade_pedida),
+        quantidade_pedida: qtdePedida,
         quantidade_entregue: parseFloat(p.quantidade_entregue || 0),
-        status: p.status
+        status: p.status,
+        embalagem_id: p.embalagem_id, embalagem_nome: p.embalagens?.nome || '—',
+        preco_unitario: preco,
+        prazo_pagamento_id: p.prazo_pagamento_id, prazo_pagamento_nome: p.prazos_pagamento?.nome || '—',
+        total_venda: qtdePedida * preco
       });
       grupos[chave]._statuses.push(p.status || 'aberto');
     }
@@ -556,30 +616,45 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
       produto: String(it.produto).toUpperCase(),
       quantidade_pedida: parseFloat(it.quantidade_pedida),
       quantidade_entregue: 0,
-      observacao: observacao || null
+      observacao: observacao || null,
+      embalagem_id: it.embalagem_id || null,
+      preco_unitario: parseFloat(it.preco_unitario || 0),
+      prazo_pagamento_id: it.prazo_pagamento_id || null
     }));
 
-    const { data, error } = await supabase.from('pedidos').insert(rows).select('*, clientes(nome)');
+    const { data, error } = await supabase.from('pedidos').insert(rows).select('*, clientes(nome), embalagens(nome), prazos_pagamento(nome)');
     if (error) throw error;
     res.json({
       numero_pedido, cliente_id, cliente_nome: data[0]?.clientes?.nome || '—',
       observacao, status: 'aberto',
-      itens: data.map(p => ({ id: p.id, produto: p.produto, quantidade_pedida: parseFloat(p.quantidade_pedida), quantidade_entregue: parseFloat(p.quantidade_entregue || 0), status: p.status }))
+      itens: data.map(p => ({
+        id: p.id, produto: p.produto,
+        quantidade_pedida: parseFloat(p.quantidade_pedida),
+        quantidade_entregue: parseFloat(p.quantidade_entregue || 0),
+        status: p.status,
+        embalagem_id: p.embalagem_id, embalagem_nome: p.embalagens?.nome || '—',
+        preco_unitario: parseFloat(p.preco_unitario || 0),
+        prazo_pagamento_id: p.prazo_pagamento_id, prazo_pagamento_nome: p.prazos_pagamento?.nome || '—',
+        total_venda: parseFloat(p.quantidade_pedida) * parseFloat(p.preco_unitario || 0)
+      }))
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
   try {
-    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao, status } = req.body;
+    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao, status, embalagem_id, preco_unitario, prazo_pagamento_id } = req.body;
     const update = {
       cliente_id, produto: produto?.toUpperCase(),
       quantidade_pedida: parseFloat(quantidade_pedida),
       quantidade_entregue: parseFloat(quantidade_entregue || 0),
-      observacao, updated_at: new Date().toISOString()
+      observacao, updated_at: new Date().toISOString(),
+      embalagem_id: embalagem_id || null,
+      preco_unitario: parseFloat(preco_unitario || 0),
+      prazo_pagamento_id: prazo_pagamento_id || null
     };
     if (status === 'aberto' || status === 'encerrado') update.status = status;
-    const { data, error } = await supabase.from('pedidos').update(update).eq('id', req.params.id).select('*, clientes(nome)').single();
+    const { data, error } = await supabase.from('pedidos').update(update).eq('id', req.params.id).select('*, clientes(nome), embalagens(nome), prazos_pagamento(nome)').single();
     if (error) throw error;
     res.json(data);
   } catch (e) { res.status(500).json({ error: e.message }); }
