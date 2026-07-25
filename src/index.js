@@ -69,6 +69,18 @@ function cleanBody(req, res, next) {
 }
 app.use('/api/', cleanBody);
 
+// Mapeia códigos de erro do Postgres para mensagens seguras
+function safeError(e, res) {
+  const code = e?.code;
+  console.error('[API ERROR]', code, e?.message); // log interno, nunca ao cliente
+  if (code === '23505') return res.status(400).json({ error: 'Registro duplicado. Verifique os dados e tente novamente.' });
+  if (code === '23503') return res.status(400).json({ error: 'Este registro está vinculado a outros dados e não pode ser excluído.' });
+  if (code === '23502') return res.status(400).json({ error: 'Campo obrigatório não informado.' });
+  if (code === '22P02') return res.status(400).json({ error: 'Valor inválido informado.' });
+  if (code === '42P01') return res.status(500).json({ error: 'Erro de configuração do servidor. Contate o suporte.' });
+  return res.status(500).json({ error: 'Erro interno do servidor. Tente novamente.' });
+}
+
 // ─── MIDDLEWARE DE AUTENTICAÇÃO ───────────────────────────────────────────────
 const requireAuth = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -199,7 +211,7 @@ app.get('/api/relatorios/resumo', requireAuth, async (req, res) => {
       por_produto, por_cliente, por_fornecedor, por_mes
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return safeError(e, res);
   }
 });
 
@@ -223,7 +235,7 @@ app.get('/api/relatorios/carregamentos', requireAuth, async (req, res) => {
     });
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return safeError(e, res);
   }
 });
 
@@ -254,7 +266,7 @@ app.get('/api/relatorios/notas-sf', requireAuth, async (req, res) => {
       }));
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    return safeError(e, res);
   }
 });
 
@@ -277,63 +289,63 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
     }
     const pedidos_abertos = (pedidos||[]).filter(p=>p.status!=='encerrado' && parseFloat(p.quantidade_entregue||0)<parseFloat(p.quantidade_pedida));
     res.json({ total_carregado, total_faturado, saldo_faturar:total_carregado-total_faturado, pedidos_abertos:pedidos_abertos.length, ultimas_notas:notas||[], por_produto:porProduto, pedidos_em_aberto:pedidos_abertos });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // ─── CADASTROS: PRODUTOS ──────────────────────────────────────────────────────
 app.get('/api/produtos', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('produtos').select('*').order('nome');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data || []);
 });
 app.post('/api/produtos', requireAuth, async (req, res) => {
   const { nome, unidade, descricao } = req.body;
   if (!nome || !unidade) return res.status(400).json({ error: 'Nome e unidade são obrigatórios' });
   const { data, error } = await supabase.from('produtos').insert([{ nome: nome.toUpperCase(), unidade, descricao }]).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/produtos/:id', requireAuth, async (req, res) => {
   const { nome, unidade, descricao } = req.body;
   const { data, error } = await supabase.from('produtos').update({ nome: nome.toUpperCase(), unidade, descricao }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.delete('/api/produtos/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('produtos').delete().eq('id', req.params.id);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json({ ok: true });
 });
 
 // ─── CADASTROS: FORNECEDORES ──────────────────────────────────────────────────
 app.get('/api/fornecedores', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('fornecedores').select('*').order('nome');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data || []);
 });
 app.post('/api/fornecedores', requireAuth, async (req, res) => {
   const { nome, cnpj, telefone, email, cidade, estado } = req.body;
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
   const { data, error } = await supabase.from('fornecedores').insert([{ nome, cnpj, telefone, email, cidade, estado }]).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/fornecedores/:id', requireAuth, async (req, res) => {
   const { nome, cnpj, telefone, email, cidade, estado } = req.body;
   const { data, error } = await supabase.from('fornecedores').update({ nome, cnpj, telefone, email, cidade, estado }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.delete('/api/fornecedores/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('fornecedores').delete().eq('id', req.params.id);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json({ ok: true });
 });
 
 // ─── CADASTROS: CLIENTES ──────────────────────────────────────────────────────
 app.get('/api/clientes', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('clientes').select('*').order('nome');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data || []);
 });
 function validaCpfCnpj(cpf_cnpj) {
@@ -353,7 +365,7 @@ app.post('/api/clientes', requireAuth, async (req, res) => {
   if (existe) return res.status(400).json({ error: `CPF/CNPJ já cadastrado para: ${existe.nome}` });
 
   const { data, error } = await supabase.from('clientes').insert([{ nome, cpf_cnpj, telefone, email, cidade, estado }]).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/clientes/:id', requireAuth, async (req, res) => {
@@ -365,38 +377,38 @@ app.put('/api/clientes/:id', requireAuth, async (req, res) => {
   if (existe) return res.status(400).json({ error: `CPF/CNPJ já cadastrado para: ${existe.nome}` });
 
   const { data, error } = await supabase.from('clientes').update({ nome, cpf_cnpj, telefone, email, cidade, estado }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.delete('/api/clientes/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('clientes').delete().eq('id', req.params.id);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json({ ok: true });
 });
 
 // ─── EMBALAGENS ───────────────────────────────────────────────────────────────
 app.get('/api/embalagens', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('embalagens').select('*').order('nome');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data || []);
 });
 app.post('/api/embalagens', requireAuth, async (req, res) => {
   const nome = clean(req.body.nome);
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
   const { data, error } = await supabase.from('embalagens').insert([{ nome, descricao: clean(req.body.descricao) }]).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/embalagens/:id', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('embalagens').update({ nome: clean(req.body.nome), descricao: clean(req.body.descricao) }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.delete('/api/embalagens/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('embalagens').delete().eq('id', req.params.id);
   if (error) {
     if (error.code === '23503') return res.status(400).json({ error: 'Esta embalagem está em uso em um ou mais pedidos e não pode ser excluída.' });
-    return res.status(500).json({ error: error.message });
+    return safeError(error, res);
   }
   res.json({ ok: true });
 });
@@ -404,26 +416,26 @@ app.delete('/api/embalagens/:id', requireAuth, async (req, res) => {
 // ─── PRAZOS DE PAGAMENTO ──────────────────────────────────────────────────────
 app.get('/api/prazos-pagamento', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('prazos_pagamento').select('*').order('nome');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data || []);
 });
 app.post('/api/prazos-pagamento', requireAuth, async (req, res) => {
   const nome = clean(req.body.nome);
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
   const { data, error } = await supabase.from('prazos_pagamento').insert([{ nome, descricao: clean(req.body.descricao) }]).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/prazos-pagamento/:id', requireAuth, async (req, res) => {
   const { data, error } = await supabase.from('prazos_pagamento').update({ nome: clean(req.body.nome), descricao: clean(req.body.descricao) }).eq('id', req.params.id).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return safeError(error, res);
   res.json(data);
 });
 app.delete('/api/prazos-pagamento/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('prazos_pagamento').delete().eq('id', req.params.id);
   if (error) {
     if (error.code === '23503') return res.status(400).json({ error: 'Este prazo de pagamento está em uso em um ou mais pedidos e não pode ser excluído.' });
-    return res.status(500).json({ error: error.message });
+    return safeError(error, res);
   }
   res.json({ ok: true });
 });
@@ -445,7 +457,7 @@ app.get('/api/carregamentos', requireAuth, async (req, res) => {
       return { ...c, fornecedor_nome:c.fornecedores?.nome||'—', faturado:+faturado.toFixed(2), saldo:+saldo.toFixed(2), status };
     });
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.post('/api/carregamentos', requireAuth, async (req, res) => {
@@ -456,7 +468,7 @@ app.post('/api/carregamentos', requireAuth, async (req, res) => {
     const { data: result, error } = await supabase.from('carregamentos').insert([{ nota_nf, data, produto, modal, quantidade:parseFloat(quantidade), custo_ton:parseFloat(custo_ton), serie_filial, fornecedor_id:fornecedor_id||null }]).select().single();
     if (error) throw error;
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.put('/api/carregamentos/:id', requireAuth, async (req, res) => {
@@ -465,7 +477,7 @@ app.put('/api/carregamentos/:id', requireAuth, async (req, res) => {
     const { data: result, error } = await supabase.from('carregamentos').update({ nota_nf, data, produto, modal, quantidade:parseFloat(quantidade), custo_ton:parseFloat(custo_ton), serie_filial, fornecedor_id:fornecedor_id||null }).eq('id', req.params.id).select().single();
     if (error) throw error;
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.delete('/api/carregamentos/:id', requireAuth, async (req, res) => {
@@ -473,7 +485,7 @@ app.delete('/api/carregamentos/:id', requireAuth, async (req, res) => {
     const { error } = await supabase.from('carregamentos').delete().eq('id', req.params.id);
     if (error) throw error;
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // ─── NOTAS SF ─────────────────────────────────────────────────────────────────
@@ -485,7 +497,7 @@ app.get('/api/notas-sf', requireAuth, async (req, res) => {
     const { data, error } = await q;
     if (error) throw error;
     res.json((data||[]).map(n=>({...n, cliente_nome:n.clientes?.nome||'—'})));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.post('/api/notas-sf', requireAuth, async (req, res) => {
@@ -511,7 +523,7 @@ app.post('/api/notas-sf', requireAuth, async (req, res) => {
     await atualizarPedidoBaixa(cliente_id, produto, parseFloat(quantidade));
 
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.put('/api/notas-sf/:id', requireAuth, async (req, res) => {
@@ -541,7 +553,7 @@ app.put('/api/notas-sf/:id', requireAuth, async (req, res) => {
     await atualizarPedidoBaixa(cliente_id, produto, parseFloat(quantidade));
 
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.delete('/api/notas-sf/:id', requireAuth, async (req, res) => {
@@ -554,7 +566,7 @@ app.delete('/api/notas-sf/:id', requireAuth, async (req, res) => {
     if (nota) await atualizarPedidoBaixa(nota.cliente_id, nota.produto, -parseFloat(nota.quantidade||0));
 
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // ─── PEDIDOS ──────────────────────────────────────────────────────────────────
@@ -598,7 +610,7 @@ app.get('/api/pedidos', requireAuth, async (req, res) => {
       return g;
     });
     res.json(result);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.post('/api/pedidos', requireAuth, async (req, res) => {
@@ -641,7 +653,7 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
         total_venda: parseFloat(p.quantidade_pedida) * parseFloat(p.preco_unitario || 0)
       }))
     });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
@@ -661,7 +673,7 @@ app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
     const { data, error } = await supabase.from('pedidos').update(update).eq('id', req.params.id).select('*, clientes(nome), embalagens(nome), prazos_pagamento(nome)').single();
     if (error) throw error;
     res.json(data);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // Encerra todos os itens de um pedido (mesmo numero_pedido) — saldo restante fica finalizado
@@ -674,7 +686,7 @@ app.post('/api/pedidos/:numero_pedido/encerrar', requireAuth, async (req, res) =
     if (error) throw error;
     if (!data.length) return res.status(404).json({ error: 'Pedido não encontrado' });
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.delete('/api/pedidos/:id', requireAuth, async (req, res) => {
@@ -682,7 +694,7 @@ app.delete('/api/pedidos/:id', requireAuth, async (req, res) => {
     const { error } = await supabase.from('pedidos').delete().eq('id', req.params.id);
     if (error) throw error;
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // ─── USUÁRIOS (Supabase Auth Admin API) ──────────────────────────────────────
@@ -697,7 +709,7 @@ app.get('/api/usuarios', requireAuth, async (req, res) => {
       last_sign_in_at: u.last_sign_in_at,
       confirmed: !!u.confirmed_at
     })));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.post('/api/usuarios', requireAuth, async (req, res) => {
@@ -710,7 +722,7 @@ app.post('/api/usuarios', requireAuth, async (req, res) => {
     });
     if (error) throw error;
     res.json({ id: data.user.id, email: data.user.email });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 app.put('/api/usuarios/:id/senha', requireAuth, async (req, res) => {
@@ -720,7 +732,7 @@ app.put('/api/usuarios/:id/senha', requireAuth, async (req, res) => {
     const { error } = await supabase.auth.admin.updateUserById(req.params.id, { password });
     if (error) throw error;
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // Não pode excluir a própria conta
@@ -731,7 +743,7 @@ app.delete('/api/usuarios/:id', requireAuth, async (req, res) => {
     const { error } = await supabase.auth.admin.deleteUser(req.params.id);
     if (error) throw error;
     res.json({ ok: true });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { return safeError(e, res); }
 });
 
 // ─── SPA CATCH-ALL ────────────────────────────────────────────────────────────
