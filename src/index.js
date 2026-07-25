@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -28,9 +30,43 @@ const supabaseAuth = createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-app.use(cors());
+app.use(helmet({ contentSecurityPolicy: false })); // CSP false pois usa CDN
+app.use(cors({
+  origin: ['https://coocamm-pedidos.vercel.app', 'http://localhost:3000'],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Rate limit geral
+app.use('/api/', rateLimit({ windowMs: 15*60*1000, max: 200, message: { error: 'Muitas requisições. Tente novamente em 15 minutos.' } }));
+// Rate limit severo no login (anti-brute-force)
+app.use('/api/auth/login', rateLimit({ windowMs: 15*60*1000, max: 10, message: { error: 'Muitas tentativas de login.' } }));
+
+// Sanitização básica de strings recebidas no body (remove tags HTML e espaços nas bordas)
+const clean = (s) => typeof s === 'string' ? s.trim().replace(/<[^>]*>/g, '') : s;
+function cleanBody(req, res, next) {
+  if (req.originalUrl.startsWith('/api/auth/')) return next(); // nunca sanitizar credenciais
+  if (req.body && typeof req.body === 'object') {
+    for (const k of Object.keys(req.body)) {
+      const v = req.body[k];
+      if (typeof v === 'string') req.body[k] = clean(v);
+      else if (Array.isArray(v)) {
+        req.body[k] = v.map(item => {
+          if (item && typeof item === 'object') {
+            const cleaned = {};
+            for (const ik of Object.keys(item)) cleaned[ik] = clean(item[ik]);
+            return cleaned;
+          }
+          return clean(item);
+        });
+      }
+    }
+  }
+  next();
+}
+app.use('/api/', cleanBody);
 
 // ─── MIDDLEWARE DE AUTENTICAÇÃO ───────────────────────────────────────────────
 const requireAuth = async (req, res, next) => {
