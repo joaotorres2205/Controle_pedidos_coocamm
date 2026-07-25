@@ -81,6 +81,18 @@ function safeError(e, res) {
   return res.status(500).json({ error: 'Erro interno do servidor. Tente novamente.' });
 }
 
+function validateNum(val, field, { min = 0, max = 9999999 } = {}) {
+  const n = parseFloat(val);
+  if (isNaN(n)) return `${field}: valor numérico inválido`;
+  if (n < min) return `${field}: deve ser maior ou igual a ${min}`;
+  if (n > max) return `${field}: valor muito alto`;
+  return null;
+}
+function validateLen(val, field, max = 200) {
+  if (val && String(val).length > max) return `${field}: máximo ${max} caracteres`;
+  return null;
+}
+
 // ─── MIDDLEWARE DE AUTENTICAÇÃO ───────────────────────────────────────────────
 const requireAuth = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -301,12 +313,16 @@ app.get('/api/produtos', requireAuth, async (req, res) => {
 app.post('/api/produtos', requireAuth, async (req, res) => {
   const { nome, unidade, descricao } = req.body;
   if (!nome || !unidade) return res.status(400).json({ error: 'Nome e unidade são obrigatórios' });
+  const erroNome = validateLen(nome, 'Nome', 150);
+  if (erroNome) return res.status(400).json({ error: erroNome });
   const { data, error } = await supabase.from('produtos').insert([{ nome: nome.toUpperCase(), unidade, descricao }]).select().single();
   if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/produtos/:id', requireAuth, async (req, res) => {
   const { nome, unidade, descricao } = req.body;
+  const erroNome = validateLen(nome, 'Nome', 150);
+  if (erroNome) return res.status(400).json({ error: erroNome });
   const { data, error } = await supabase.from('produtos').update({ nome: nome.toUpperCase(), unidade, descricao }).eq('id', req.params.id).select().single();
   if (error) return safeError(error, res);
   res.json(data);
@@ -326,12 +342,16 @@ app.get('/api/fornecedores', requireAuth, async (req, res) => {
 app.post('/api/fornecedores', requireAuth, async (req, res) => {
   const { nome, cnpj, telefone, email, cidade, estado } = req.body;
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
+  const erroNome = validateLen(nome, 'Nome', 150);
+  if (erroNome) return res.status(400).json({ error: erroNome });
   const { data, error } = await supabase.from('fornecedores').insert([{ nome, cnpj, telefone, email, cidade, estado }]).select().single();
   if (error) return safeError(error, res);
   res.json(data);
 });
 app.put('/api/fornecedores/:id', requireAuth, async (req, res) => {
   const { nome, cnpj, telefone, email, cidade, estado } = req.body;
+  const erroNome = validateLen(nome, 'Nome', 150);
+  if (erroNome) return res.status(400).json({ error: erroNome });
   const { data, error } = await supabase.from('fornecedores').update({ nome, cnpj, telefone, email, cidade, estado }).eq('id', req.params.id).select().single();
   if (error) return safeError(error, res);
   res.json(data);
@@ -358,6 +378,8 @@ function validaCpfCnpj(cpf_cnpj) {
 app.post('/api/clientes', requireAuth, async (req, res) => {
   const { nome, cpf_cnpj, telefone, email, cidade, estado } = req.body;
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
+  const erroNome = validateLen(nome, 'Nome', 150);
+  if (erroNome) return res.status(400).json({ error: erroNome });
   const erroCpf = validaCpfCnpj(cpf_cnpj);
   if (erroCpf) return res.status(400).json({ error: erroCpf });
 
@@ -370,6 +392,8 @@ app.post('/api/clientes', requireAuth, async (req, res) => {
 });
 app.put('/api/clientes/:id', requireAuth, async (req, res) => {
   const { nome, cpf_cnpj, telefone, email, cidade, estado } = req.body;
+  const erroNome = validateLen(nome, 'Nome', 150);
+  if (erroNome) return res.status(400).json({ error: erroNome });
   const erroCpf = validaCpfCnpj(cpf_cnpj);
   if (erroCpf) return res.status(400).json({ error: erroCpf });
 
@@ -465,6 +489,12 @@ app.post('/api/carregamentos', requireAuth, async (req, res) => {
     const { nota_nf, data, produto, modal, quantidade, custo_ton, serie_filial, fornecedor_id } = req.body;
     if (!nota_nf||!data||!produto||!modal||!quantidade||!custo_ton)
       return res.status(400).json({ error: 'Campos obrigatórios: Nota NF, Data, Produto, Modal, Quantidade, Custo' });
+    const erros = [
+      validateLen(nota_nf, 'Nota NF', 50),
+      validateNum(quantidade, 'Quantidade', { min: 0.001, max: 99999 }),
+      validateNum(custo_ton, 'Custo R$/t', { min: 0, max: 99999 }),
+    ].filter(Boolean);
+    if (erros.length) return res.status(400).json({ error: erros[0] });
     const { data: result, error } = await supabase.from('carregamentos').insert([{ nota_nf, data, produto, modal, quantidade:parseFloat(quantidade), custo_ton:parseFloat(custo_ton), serie_filial, fornecedor_id:fornecedor_id||null }]).select().single();
     if (error) throw error;
     res.json(result);
@@ -474,6 +504,12 @@ app.post('/api/carregamentos', requireAuth, async (req, res) => {
 app.put('/api/carregamentos/:id', requireAuth, async (req, res) => {
   try {
     const { nota_nf, data, produto, modal, quantidade, custo_ton, serie_filial, fornecedor_id } = req.body;
+    const erros = [
+      validateLen(nota_nf, 'Nota NF', 50),
+      validateNum(quantidade, 'Quantidade', { min: 0.001, max: 99999 }),
+      validateNum(custo_ton, 'Custo R$/t', { min: 0, max: 99999 }),
+    ].filter(Boolean);
+    if (erros.length) return res.status(400).json({ error: erros[0] });
     const { data: result, error } = await supabase.from('carregamentos').update({ nota_nf, data, produto, modal, quantidade:parseFloat(quantidade), custo_ton:parseFloat(custo_ton), serie_filial, fornecedor_id:fornecedor_id||null }).eq('id', req.params.id).select().single();
     if (error) throw error;
     res.json(result);
@@ -505,6 +541,12 @@ app.post('/api/notas-sf', requireAuth, async (req, res) => {
     const { nota_sf, data, produto, carregamento_id, cliente_id, quantidade, valor_total, codigo_fiscal } = req.body;
     if (!nota_sf||!data||!produto||!carregamento_id||!cliente_id||!quantidade||!valor_total)
       return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
+    const errosNota = [
+      validateLen(nota_sf, 'Nota SF', 50),
+      validateNum(quantidade, 'Quantidade', { min: 0.001, max: 99999 }),
+      validateNum(valor_total, 'Valor total', { min: 0, max: 99999999 }),
+    ].filter(Boolean);
+    if (errosNota.length) return res.status(400).json({ error: errosNota[0] });
 
     // Valida saldo do carregamento
     const { data: carr, error: carrErr } = await supabase.from('carregamentos').select('quantidade, notas_sf(quantidade)').eq('id', carregamento_id).single();
@@ -531,6 +573,12 @@ app.put('/api/notas-sf/:id', requireAuth, async (req, res) => {
     const { nota_sf, data, produto, carregamento_id, cliente_id, quantidade, valor_total, codigo_fiscal } = req.body;
     if (!nota_sf||!data||!produto||!carregamento_id||!cliente_id||!quantidade||!valor_total)
       return res.status(400).json({ error: 'Todos os campos obrigatórios devem ser preenchidos' });
+    const errosNota = [
+      validateLen(nota_sf, 'Nota SF', 50),
+      validateNum(quantidade, 'Quantidade', { min: 0.001, max: 99999 }),
+      validateNum(valor_total, 'Valor total', { min: 0, max: 99999999 }),
+    ].filter(Boolean);
+    if (errosNota.length) return res.status(400).json({ error: errosNota[0] });
 
     // Busca nota original para estorno
     const { data: antiga, error: eAnt } = await supabase.from('notas_sf').select('*').eq('id', req.params.id).single();
@@ -620,6 +668,14 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
     if (!cliente_id) return res.status(400).json({ error: 'Cliente é obrigatório' });
     if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida))
       return res.status(400).json({ error: 'Informe ao menos um produto com quantidade pedida' });
+
+    for (const it of itens) {
+      const erros = [
+        validateNum(it.quantidade_pedida, 'Quantidade pedida', { min: 0.001, max: 99999 }),
+        it.preco_unitario !== undefined ? validateNum(it.preco_unitario, 'Preço unitário', { min: 0, max: 99999 }) : null,
+      ].filter(Boolean);
+      if (erros.length) return res.status(400).json({ error: erros[0] });
+    }
 
     const { count } = await supabase.from('pedidos').select('*', { count: 'exact', head: true });
     const numero_pedido = `PED-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
