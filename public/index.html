@@ -940,7 +940,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 <!-- Confirm Delete -->
 <div class="modal-bg" id="confirm-modal" hidden>
 <div class="modal-box" style="max-width:360px">
-  <div class="modal-head"><h3>Confirmar exclusão</h3><button onclick="closeModal('confirm-modal')">✕</button></div>
+  <div class="modal-head"><h3 id="confirm-title">Confirmar exclusão</h3><button onclick="closeModal('confirm-modal')">✕</button></div>
   <div class="modal-body"><p id="confirm-msg">Tem certeza que deseja excluir este registro?</p></div>
   <div class="modal-foot">
     <button class="btn btn-outline" onclick="closeModal('confirm-modal')">Cancelar</button>
@@ -1641,11 +1641,19 @@ async function submitPedido() {
 }
 
 function encerrarPedido(numero_pedido) {
-  document.getElementById('confirm-msg').textContent = `Encerrar pedido ${numero_pedido}? O saldo restante será dado como finalizado.`;
-  document.getElementById('confirm-ok-btn').onclick = async () => {
+  document.getElementById('confirm-title').textContent = 'Encerrar Pedido';
+  document.getElementById('confirm-msg').textContent = `Encerrar o pedido ${numero_pedido}? O saldo restante será dado como finalizado.`;
+  const btn = document.getElementById('confirm-ok-btn');
+  btn.textContent = 'Encerrar';
+  btn.className = 'btn btn-primary';
+  btn.onclick = async () => {
     try {
       await req('POST', `/pedidos/${encodeURIComponent(numero_pedido)}/encerrar`);
-      closeModal('confirm-modal'); toast('Pedido encerrado!'); loadPedidos();
+      closeModal('confirm-modal');
+      // Restaura padrão
+      document.getElementById('confirm-title').textContent = 'Confirmar exclusão';
+      btn.textContent = 'Excluir'; btn.className = 'btn btn-danger';
+      toast('Pedido encerrado!'); loadPedidos();
     } catch(e) { toast(e.message, 'err'); }
   };
   openModal('confirm-modal');
