@@ -384,6 +384,11 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
       <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
       Cadastros
     </a>
+    <div class="sidebar-sub">Sistema</div>
+    <a href="#" data-sec="usuarios">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Usuários
+    </a>
   </nav>
   <div class="user-box">
     <div class="email" id="user-email">—</div>
@@ -679,6 +684,22 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
       </div>
     </section>
 
+    <!-- ── USUÁRIOS ──────────────────────────────────────────────── -->
+    <section id="sec-usuarios" hidden>
+      <div class="section-header">
+        <h2>Usuários do Sistema</h2>
+        <div class="actions">
+          <button class="btn btn-primary btn-sm" onclick="openUsuarioModal()">+ Novo Usuário</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table id="usr-tbl">
+          <thead><tr><th>Email</th><th>Cadastrado em</th><th>Último acesso</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
   </div><!-- /content -->
 
   <footer>COOCAMM — Controle de Notas 2026 | <span id="footer-date"></span></footer>
@@ -851,6 +872,28 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 </div>
 </div>
 
+<!-- Modal Usuário -->
+<div class="modal-bg" id="modal-usuario" hidden>
+<div class="modal-box" style="max-width:420px">
+  <div class="modal-head"><h3 id="usr-modal-title">Novo Usuário</h3><button onclick="closeModal('modal-usuario')">✕</button></div>
+  <div class="modal-body">
+    <div class="field" id="usr-email-wrap">
+      <label>Email *</label>
+      <input id="usr-email" type="email" placeholder="usuario@coocamm.com.br">
+    </div>
+    <div class="field">
+      <label id="usr-senha-label">Senha *</label>
+      <input id="usr-senha" type="password" placeholder="Mínimo 6 caracteres">
+      <div class="hint">A senha pode ser alterada pelo próprio usuário após o primeiro acesso</div>
+    </div>
+  </div>
+  <div class="modal-foot">
+    <button class="btn btn-outline" onclick="closeModal('modal-usuario')">Cancelar</button>
+    <button class="btn btn-primary" onclick="submitUsuario()">Salvar</button>
+  </div>
+</div>
+</div>
+
 <!-- Confirm Delete -->
 <div class="modal-bg" id="confirm-modal" hidden>
 <div class="modal-box" style="max-width:360px">
@@ -914,7 +957,7 @@ function doLogout() {
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
-const SECTIONS = { dashboard:'Dashboard', carregamentos:'Carregamentos', notas:'Notas SF', pedidos:'Pedidos', relatorios:'Relatórios', cadastros:'Cadastros' };
+const SECTIONS = { dashboard:'Dashboard', carregamentos:'Carregamentos', notas:'Notas SF', pedidos:'Pedidos', relatorios:'Relatórios', cadastros:'Cadastros', usuarios:'Usuários' };
 
 function navigate(sec) {
   Object.keys(SECTIONS).forEach(s => {
@@ -932,6 +975,7 @@ function navigate(sec) {
   if (sec === 'pedidos') loadPedidos();
   if (sec === 'relatorios') { initRelFiltros().then(() => gerarRelatorio()); }
   if (sec === 'cadastros') loadCadastros();
+  if (sec === 'usuarios') loadUsuarios();
 }
 
 // ─── SHOW APP ────────────────────────────────────────────────────────────────
@@ -1613,6 +1657,73 @@ async function submitCli() {
   } catch(e) { toast(e.message, 'err'); }
 }
 
+// ─── USUÁRIOS ─────────────────────────────────────────────────────────────────
+async function loadUsuarios() {
+  try {
+    const users = await req('GET', '/usuarios');
+    const tb = document.querySelector('#usr-tbl tbody');
+    const me = S.user?.id;
+    tb.innerHTML = users.length ? users.map(u => `
+      <tr>
+        <td><strong>${u.email}</strong>${u.id===me?' <span class="badge" style="background:var(--green-xl);color:var(--green)">Você</span>':''}</td>
+        <td>${fmtDatetime(u.created_at)}</td>
+        <td>${u.last_sign_in_at ? fmtDatetime(u.last_sign_in_at) : '—'}</td>
+        <td><span class="badge ${u.confirmed?'badge-open':'badge-almost'}">${u.confirmed?'Ativo':'Pendente'}</span></td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick='resetSenha("${u.id}","${u.email}")'>🔑 Senha</button>
+          ${u.id!==me?`<button class="btn btn-danger btn-sm" onclick='confirmDeleteUsuario("${u.id}","${u.email}")'>🗑</button>`:''}
+        </td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" class="tbl-empty">Nenhum usuário encontrado.</td></tr>';
+  } catch(e) { toast('Erro ao carregar usuários: '+e.message,'err'); }
+}
+
+function openUsuarioModal() {
+  S.editId = null;
+  document.getElementById('usr-modal-title').textContent = 'Novo Usuário';
+  document.getElementById('usr-email-wrap').hidden = false;
+  document.getElementById('usr-senha-label').textContent = 'Senha *';
+  document.getElementById('usr-email').value = '';
+  document.getElementById('usr-senha').value = '';
+  openModal('modal-usuario');
+}
+
+function resetSenha(id, email) {
+  S.editId = id;
+  document.getElementById('usr-modal-title').textContent = 'Redefinir senha — ' + email;
+  document.getElementById('usr-email-wrap').hidden = true;
+  document.getElementById('usr-senha-label').textContent = 'Nova Senha *';
+  document.getElementById('usr-senha').value = '';
+  openModal('modal-usuario');
+}
+
+async function submitUsuario() {
+  try {
+    if (S.editId) {
+      await req('PUT', '/usuarios/'+S.editId+'/senha', { password: v('usr-senha') });
+      toast('Senha atualizada!');
+    } else {
+      await req('POST', '/usuarios', { email: v('usr-email'), password: v('usr-senha') });
+      toast('Usuário criado com sucesso!');
+    }
+    closeModal('modal-usuario');
+    loadUsuarios();
+  } catch(e) { toast(e.message,'err'); }
+}
+
+function confirmDeleteUsuario(id, email) {
+  document.getElementById('confirm-msg').textContent = 'Excluir usuário "'+email+'"? Esta ação não pode ser desfeita.';
+  document.getElementById('confirm-ok-btn').onclick = async () => {
+    try {
+      await req('DELETE', '/usuarios/'+id);
+      closeModal('confirm-modal');
+      toast('Usuário excluído.');
+      loadUsuarios();
+    } catch(e) { toast(e.message,'err'); }
+  };
+  openModal('confirm-modal');
+}
+
 // ─── DELETE CONFIRM ──────────────────────────────────────────────────────────
 function confirmDelete(type, id) {
   const msgs = {
@@ -1667,6 +1778,7 @@ const today = () => new Date().toISOString().split('T')[0];
 const fmt = n => (parseFloat(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtMoney = n => 'R$ ' + fmt(n);
 const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+const fmtDatetime = dt => dt ? new Date(dt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) : '—';
 
 function populateSelect(id, arr, valKey, labelKey, emptyLabel = null) {
   const sel = document.getElementById(id);

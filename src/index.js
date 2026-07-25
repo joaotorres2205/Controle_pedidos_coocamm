@@ -50,6 +50,7 @@ function cleanBody(req, res, next) {
   if (req.originalUrl.startsWith('/api/auth/')) return next(); // nunca sanitizar credenciais
   if (req.body && typeof req.body === 'object') {
     for (const k of Object.keys(req.body)) {
+      if (k === 'password') continue; // nunca sanitizar senha
       const v = req.body[k];
       if (typeof v === 'string') req.body[k] = clean(v);
       else if (Array.isArray(v)) {
@@ -600,6 +601,55 @@ app.post('/api/pedidos/:numero_pedido/encerrar', requireAuth, async (req, res) =
 app.delete('/api/pedidos/:id', requireAuth, async (req, res) => {
   try {
     const { error } = await supabase.from('pedidos').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── USUÁRIOS (Supabase Auth Admin API) ──────────────────────────────────────
+app.get('/api/usuarios', requireAuth, async (req, res) => {
+  try {
+    const { data: { users }, error } = await supabase.auth.admin.listUsers();
+    if (error) throw error;
+    res.json(users.map(u => ({
+      id: u.id,
+      email: u.email,
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at,
+      confirmed: !!u.confirmed_at
+    })));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/usuarios', requireAuth, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+    if (password.length < 6) return res.status(400).json({ error: 'Senha deve ter no mínimo 6 caracteres' });
+    const { data, error } = await supabase.auth.admin.createUser({
+      email, password, email_confirm: true
+    });
+    if (error) throw error;
+    res.json({ id: data.user.id, email: data.user.email });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/usuarios/:id/senha', requireAuth, async (req, res) => {
+  try {
+    const { password } = req.body;
+    if (!password || password.length < 6) return res.status(400).json({ error: 'Senha deve ter no mínimo 6 caracteres' });
+    const { error } = await supabase.auth.admin.updateUserById(req.params.id, { password });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Não pode excluir a própria conta
+app.delete('/api/usuarios/:id', requireAuth, async (req, res) => {
+  try {
+    if (req.params.id === req.user.id)
+      return res.status(400).json({ error: 'Você não pode excluir sua própria conta' });
+    const { error } = await supabase.auth.admin.deleteUser(req.params.id);
     if (error) throw error;
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
