@@ -586,6 +586,7 @@ app.get('/api/pedidos', requireAuth, async (req, res) => {
         embalagem_id: p.embalagem_id, embalagem_nome: p.embalagens?.nome || '—',
         preco_unitario: preco,
         prazo_pagamento_id: p.prazo_pagamento_id, prazo_pagamento_nome: p.prazos_pagamento?.nome || '—',
+        data_pagamento: p.data_pagamento,
         total_venda: qtdePedida * preco
       });
       grupos[chave]._statuses.push(p.status || 'aberto');
@@ -619,7 +620,8 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
       observacao: observacao || null,
       embalagem_id: it.embalagem_id || null,
       preco_unitario: parseFloat(it.preco_unitario || 0),
-      prazo_pagamento_id: it.prazo_pagamento_id || null
+      prazo_pagamento_id: it.prazo_pagamento_id || null,
+      data_pagamento: it.data_pagamento || null
     }));
 
     const { data, error } = await supabase.from('pedidos').insert(rows).select('*, clientes(nome), embalagens(nome), prazos_pagamento(nome)');
@@ -635,6 +637,7 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
         embalagem_id: p.embalagem_id, embalagem_nome: p.embalagens?.nome || '—',
         preco_unitario: parseFloat(p.preco_unitario || 0),
         prazo_pagamento_id: p.prazo_pagamento_id, prazo_pagamento_nome: p.prazos_pagamento?.nome || '—',
+        data_pagamento: p.data_pagamento,
         total_venda: parseFloat(p.quantidade_pedida) * parseFloat(p.preco_unitario || 0)
       }))
     });
@@ -643,7 +646,7 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
 
 app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
   try {
-    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao, status, embalagem_id, preco_unitario, prazo_pagamento_id } = req.body;
+    const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao, status, embalagem_id, preco_unitario, prazo_pagamento_id, data_pagamento } = req.body;
     const update = {
       cliente_id, produto: produto?.toUpperCase(),
       quantidade_pedida: parseFloat(quantidade_pedida),
@@ -651,7 +654,8 @@ app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
       observacao, updated_at: new Date().toISOString(),
       embalagem_id: embalagem_id || null,
       preco_unitario: parseFloat(preco_unitario || 0),
-      prazo_pagamento_id: prazo_pagamento_id || null
+      prazo_pagamento_id: prazo_pagamento_id || null,
+      data_pagamento: data_pagamento || null
     };
     if (status === 'aberto' || status === 'encerrado') update.status = status;
     const { data, error } = await supabase.from('pedidos').update(update).eq('id', req.params.id).select('*, clientes(nome), embalagens(nome), prazos_pagamento(nome)').single();

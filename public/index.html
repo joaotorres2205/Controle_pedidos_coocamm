@@ -141,6 +141,8 @@ section{animation:fadeUp .3s ease both}
 .filter-bar{display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1.1rem;align-items:center}
 .filter-bar select,.filter-bar input{padding:.46rem .85rem;border:1.5px solid var(--border);border-radius:var(--r-sm);background:#fff;color:var(--text);font-size:.84rem;transition:var(--transition)}
 .filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(26,92,56,.08)}
+.toggle-wrap{display:inline-flex;align-items:center;gap:.5rem;font-size:.84rem;color:var(--text);cursor:pointer;user-select:none}
+.toggle-wrap input[type=checkbox]{width:16px;height:16px;accent-color:var(--green);cursor:pointer}
 
 /* Tables */
 .tbl-wrap{overflow-x:auto;border-radius:var(--r);box-shadow:var(--sh);border:1px solid rgba(212,227,208,.25)}
@@ -248,6 +250,8 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 /* Hierarquia de pedidos (agrupado por numero_pedido) */
 .ped-parent{cursor:pointer}
 .ped-parent:hover{background:var(--green-xl)!important}
+.ped-parent.ped-encerrado{opacity:.7;background:#f8f8f8}
+.ped-parent.ped-encerrado:hover{background:#f0f0f0!important}
 .ped-child-wrap td{padding:0!important;border:none!important}
 
 /* Tabs */
@@ -513,6 +517,12 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
           <button class="btn btn-primary btn-sm" onclick="openPedidoModal()">+ Novo Pedido</button>
         </div>
       </div>
+      <div class="filter-bar">
+        <label class="toggle-wrap">
+          <input type="checkbox" id="f-ped-encerrados" onchange="salvarFiltroPedidos(); loadPedidos()">
+          <span>Mostrar encerrados</span>
+        </label>
+      </div>
       <div class="tbl-wrap">
         <table id="pedido-tbl">
           <thead>
@@ -643,7 +653,6 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         <button class="tab" onclick="switchTab('fornecedores')">🚚 Fornecedores</button>
         <button class="tab" onclick="switchTab('clientes')">👤 Clientes</button>
         <button class="tab" onclick="switchTab('embalagens')">📦 Embalagens</button>
-        <button class="tab" onclick="switchTab('prazos')">💳 Prazos Pgto</button>
       </div>
 
       <!-- Produtos -->
@@ -696,20 +705,6 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
         </div>
         <div class="tbl-wrap">
           <table id="emb-tbl">
-            <thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Prazos de Pagamento -->
-      <div id="tab-prazos" hidden>
-        <div class="section-header" style="margin-bottom:.8rem">
-          <span style="flex:1;font-size:.85rem;color:var(--muted)">Condições de pagamento usadas nos pedidos</span>
-          <button class="btn btn-primary btn-sm" onclick="openPrazoModal()">+ Prazo</button>
-        </div>
-        <div class="tbl-wrap">
-          <table id="prazo-tbl">
             <thead><tr><th>Nome</th><th>Descrição</th><th>Ações</th></tr></thead>
             <tbody></tbody>
           </table>
@@ -874,21 +869,6 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 </div>
 </div>
 
-<!-- Modal Prazo de Pagamento -->
-<div class="modal-bg" id="modal-prazo" hidden>
-<div class="modal-box" style="max-width:400px">
-  <div class="modal-head"><h3 id="prazo-modal-title">Novo Prazo de Pagamento</h3><button onclick="closeModal('modal-prazo')">✕</button></div>
-  <div class="modal-body">
-    <div class="field"><label>Nome *</label><input id="prazo-nome" placeholder="Ex: 30/60/90 dias"></div>
-    <div class="field"><label>Descrição</label><textarea id="prazo-descricao" rows="2" placeholder="Descrição opcional"></textarea></div>
-  </div>
-  <div class="modal-foot">
-    <button class="btn btn-outline" onclick="closeModal('modal-prazo')">Cancelar</button>
-    <button class="btn btn-primary" onclick="submitPrazo()">Salvar</button>
-  </div>
-</div>
-</div>
-
 <!-- Modal Fornecedor -->
 <div class="modal-bg" id="modal-forn" hidden>
 <div class="modal-box" style="max-width:460px">
@@ -979,7 +959,7 @@ const S = {
   token: localStorage.getItem('ibiata_token'),
   user: null,
   produtos: [], fornecedores: [], clientes: [],
-  embalagens: [], prazos: [],
+  embalagens: [],
   carregamentos: [], notas: [], pedidos: [],
   editId: null, editType: null,
   dashChart: null
@@ -1036,7 +1016,7 @@ function navigate(sec) {
   if (sec === 'dashboard') loadDashboard();
   if (sec === 'carregamentos') loadCarregamentos();
   if (sec === 'notas') loadNotas();
-  if (sec === 'pedidos') loadPedidos();
+  if (sec === 'pedidos') { restaurarFiltroPedidos(); loadPedidos(); }
   if (sec === 'relatorios') { initRelFiltros().then(() => gerarRelatorio()); }
   if (sec === 'cadastros') loadCadastros();
   if (sec === 'usuarios') loadUsuarios();
@@ -1052,9 +1032,9 @@ async function showApp() {
   document.getElementById('user-badge').textContent = email.split('@')[0] || 'Usuário';
   // Load lookup data
   try {
-    [S.produtos, S.fornecedores, S.clientes, S.embalagens, S.prazos] = await Promise.all([
+    [S.produtos, S.fornecedores, S.clientes, S.embalagens] = await Promise.all([
       req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes'),
-      req('GET', '/embalagens'), req('GET', '/prazos-pagamento')
+      req('GET', '/embalagens')
     ]);
   } catch(e) { toast('Erro ao carregar cadastros: ' + e.message, 'err'); }
   await loadDashboard();
@@ -1432,9 +1412,23 @@ async function editNotaSF(sf) {
 
 // ─── PEDIDOS ─────────────────────────────────────────────────────────────────
 // Cada pedido (numero_pedido) agrupa N itens (1 produto por item)
+function salvarFiltroPedidos() {
+  const val = document.getElementById('f-ped-encerrados')?.checked;
+  localStorage.setItem('coocamm_ped_encerrados', val ? '1' : '0');
+}
+
+function restaurarFiltroPedidos() {
+  const salvo = localStorage.getItem('coocamm_ped_encerrados');
+  const el = document.getElementById('f-ped-encerrados');
+  if (el) el.checked = salvo === '1';
+}
+
 async function loadPedidos() {
   try {
-    S.pedidos = await req('GET', '/pedidos');
+    if (!S.pedidos.length) restaurarFiltroPedidos();
+    const todos = await req('GET', '/pedidos');
+    const mostrarEncerrados = document.getElementById('f-ped-encerrados')?.checked;
+    S.pedidos = mostrarEncerrados ? todos : todos.filter(p => p.status !== 'encerrado');
     renderPedidos();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
@@ -1454,7 +1448,7 @@ function renderPedidos() {
     const rowId = 'ped-row-' + idx;
     const idsJson = JSON.stringify(ped.itens.map(i => i.id));
 
-    html += `<tr class="ped-parent" onclick="togglePed('${rowId}')">
+    html += `<tr class="ped-parent${encerrado ? ' ped-encerrado' : ''}" onclick="togglePed('${rowId}')">
       <td><span class="expand-icon" id="icon-${rowId}">▶</span><strong>${ped.numero_pedido || '—'}</strong></td>
       <td>${ped.cliente_nome || '—'}</td>
       <td style="font-size:.8rem;color:var(--muted)">${ped.itens.map(i=>i.produto).join(', ')}</td>
@@ -1476,7 +1470,7 @@ function renderPedidos() {
     html += `<tr class="ped-child-wrap" id="${rowId}" hidden><td colspan="8">`;
     html += `<table class="sf-inner-tbl"><thead><tr>
       <th class="sf-child-indent">↳ Produto</th><th>Pedido (t)</th><th>Entregue (t)</th><th>Saldo (t)</th>
-      <th>Embalagem</th><th>R$/t</th><th>Total R$</th><th>Prazo Pgto</th>
+      <th>Embalagem</th><th>R$/t</th><th>Total R$</th><th>Data Pgto</th>
       <th>Progresso</th><th></th>
     </tr></thead><tbody>`;
     ped.itens.forEach(it => {
@@ -1490,7 +1484,7 @@ function renderPedidos() {
         <td style="font-size:.8rem">${it.embalagem_nome || '—'}</td>
         <td>${it.preco_unitario ? fmtMoney(it.preco_unitario) : '—'}</td>
         <td><strong>${it.total_venda ? fmtMoney(it.total_venda) : '—'}</strong></td>
-        <td style="font-size:.8rem">${it.prazo_pagamento_nome || '—'}</td>
+        <td style="font-size:.8rem">${it.data_pagamento ? fmtDate(it.data_pagamento) : '—'}</td>
         <td><div class="prog" style="min-width:60px;display:inline-block;vertical-align:middle"><div class="prog-fill" style="width:${p2}%"></div></div></td>
         <td>
           <button class="btn btn-secondary btn-sm" onclick='editPedidoItem(${JSON.stringify(it)}, ${JSON.stringify({numero_pedido:ped.numero_pedido,cliente_id:ped.cliente_id,observacao:ped.observacao})})'>✎</button>
@@ -1513,15 +1507,12 @@ function togglePed(id) {
   if (icon) icon.classList.toggle('open', !row.hidden);
 }
 
-function pedidoItemRowHtml(produto = '', qtde = '', embalagem_id = '', preco = '', prazo_pagamento_id = '') {
+function pedidoItemRowHtml(produto = '', qtde = '', embalagem_id = '', preco = '', dataPagamento = '') {
   const prodOptions = '<option value="">— Produto —</option>' + S.produtos.map(p =>
     `<option value="${p.nome}"${p.nome === produto ? ' selected' : ''}>${p.nome}</option>`
   ).join('');
   const embOptions = '<option value="">Embalagem</option>' + S.embalagens.map(e =>
     `<option value="${e.id}"${e.id === embalagem_id ? ' selected' : ''}>${e.nome}</option>`
-  ).join('');
-  const prazoOptions = '<option value="">Prazo</option>' + S.prazos.map(pz =>
-    `<option value="${pz.id}"${pz.id === prazo_pagamento_id ? ' selected' : ''}>${pz.nome}</option>`
   ).join('');
   const totalInicial = qtde && preco ? fmtMoney(parseFloat(qtde) * parseFloat(preco)) : '';
   return `<div class="pedido-item-row" data-row>
@@ -1533,7 +1524,10 @@ function pedidoItemRowHtml(produto = '', qtde = '', embalagem_id = '', preco = '
     </div>
     <div class="pi-grid2">
       <input class="pi-preco" type="number" step="0.01" placeholder="R$/t" value="${preco}" oninput="calcItemTotal(this)">
-      <select class="pi-prazo">${prazoOptions}</select>
+      <div>
+        <label style="display:block;font-size:.66rem;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:.25rem">Data de Pagamento</label>
+        <input class="pi-data_pagamento" type="date" value="${dataPagamento || ''}">
+      </div>
     </div>
     <input class="pi-total" type="text" readonly placeholder="Total R$" value="${totalInicial}">
   </div>`;
@@ -1546,8 +1540,8 @@ function calcItemTotal(el) {
   row.querySelector('.pi-total').value = qtde && preco ? fmtMoney(qtde * preco) : '';
 }
 
-function addPedidoItemRow(produto = '', qtde = '', embalagem_id = '', preco = '', prazo_pagamento_id = '') {
-  document.getElementById('p-itens').insertAdjacentHTML('beforeend', pedidoItemRowHtml(produto, qtde, embalagem_id, preco, prazo_pagamento_id));
+function addPedidoItemRow(produto = '', qtde = '', embalagem_id = '', preco = '', dataPagamento = '') {
+  document.getElementById('p-itens').insertAdjacentHTML('beforeend', pedidoItemRowHtml(produto, qtde, embalagem_id, preco, dataPagamento));
   updatePedidoRemoveButtons();
 }
 
@@ -1583,7 +1577,7 @@ function editPedidoItem(item, ped) {
   document.getElementById('p-cliente_id').value = ped.cliente_id;
   createSearchSelect('p-cliente_search', 'p-cliente_id', S.clientes, 'nome', 'id');
   document.getElementById('p-itens').innerHTML = '';
-  addPedidoItemRow(item.produto, item.quantidade_pedida, item.embalagem_id || '', item.preco_unitario || '', item.prazo_pagamento_id || '');
+  addPedidoItemRow(item.produto, item.quantidade_pedida, item.embalagem_id || '', item.preco_unitario || '', item.data_pagamento || '');
   document.getElementById('p-add-item-btn').hidden = true;
   updatePedidoRemoveButtons();
   document.querySelectorAll('#p-itens [data-row] button').forEach(b => b.style.visibility = 'hidden');
@@ -1601,7 +1595,7 @@ async function submitPedido() {
     quantidade_pedida: r.querySelector('.pi-qtde').value,
     embalagem_id: r.querySelector('.pi-embalagem').value || null,
     preco_unitario: r.querySelector('.pi-preco').value || 0,
-    prazo_pagamento_id: r.querySelector('.pi-prazo').value || null
+    data_pagamento: r.querySelector('.pi-data_pagamento').value || null
   }));
   if (!itens.length || itens.some(it => !it.produto || !it.quantidade_pedida)) {
     toast('Informe ao menos um produto com quantidade pedida', 'err'); return;
@@ -1611,7 +1605,7 @@ async function submitPedido() {
       await req('PUT', '/pedidos/' + S.editId, {
         cliente_id, produto: itens[0].produto, quantidade_pedida: itens[0].quantidade_pedida,
         quantidade_entregue: v('p-qtde_entregue') || 0, observacao: v('p-observacao'),
-        embalagem_id: itens[0].embalagem_id, preco_unitario: itens[0].preco_unitario, prazo_pagamento_id: itens[0].prazo_pagamento_id
+        embalagem_id: itens[0].embalagem_id, preco_unitario: itens[0].preco_unitario, data_pagamento: itens[0].data_pagamento
       });
     } else {
       await req('POST', '/pedidos', { cliente_id, observacao: v('p-observacao'), itens });
@@ -1645,11 +1639,11 @@ function deletePedidoGrupo(numero_pedido, ids) {
 // ─── CADASTROS ────────────────────────────────────────────────────────────────
 async function loadCadastros() {
   try {
-    [S.produtos, S.fornecedores, S.clientes, S.embalagens, S.prazos] = await Promise.all([
+    [S.produtos, S.fornecedores, S.clientes, S.embalagens] = await Promise.all([
       req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes'),
-      req('GET', '/embalagens'), req('GET', '/prazos-pagamento')
+      req('GET', '/embalagens')
     ]);
-    renderProd(); renderForn(); renderCli(); renderEmb(); renderPrazo();
+    renderProd(); renderForn(); renderCli(); renderEmb();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
 }
 
@@ -1699,18 +1693,7 @@ function renderEmb() {
   </tr>`).join('') : `<tr><td colspan="3" class="tbl-empty">Nenhuma embalagem cadastrada.</td></tr>`;
 }
 
-function renderPrazo() {
-  const tb = document.querySelector('#prazo-tbl tbody');
-  tb.innerHTML = S.prazos.length ? S.prazos.map(p => `<tr>
-    <td><strong>${p.nome}</strong></td><td>${p.descricao || '—'}</td>
-    <td>
-      <button class="btn btn-secondary btn-sm" onclick='editPrazo(${JSON.stringify(p)})'>✎</button>
-      <button class="btn btn-danger btn-sm" onclick='confirmDelete("prazo","${p.id}")'>🗑</button>
-    </td>
-  </tr>`).join('') : `<tr><td colspan="3" class="tbl-empty">Nenhum prazo cadastrado.</td></tr>`;
-}
-
-const CADASTRO_TABS = ['produtos','fornecedores','clientes','embalagens','prazos'];
+const CADASTRO_TABS = ['produtos','fornecedores','clientes','embalagens'];
 function switchTab(t) {
   CADASTRO_TABS.forEach(tab => {
     document.getElementById('tab-'+tab).hidden = tab !== t;
@@ -1754,24 +1737,6 @@ async function submitEmb() {
     if (S.editId) await req('PUT', '/embalagens/' + S.editId, d);
     else await req('POST', '/embalagens', d);
     closeModal('modal-emb'); toast('Embalagem salva!'); loadCadastros();
-  } catch(e) { toast(e.message, 'err'); }
-}
-
-// Prazo de pagamento modal
-function openPrazoModal(p = null) {
-  S.editId = p?.id || null;
-  document.getElementById('prazo-modal-title').textContent = p ? 'Editar Prazo de Pagamento' : 'Novo Prazo de Pagamento';
-  document.getElementById('prazo-nome').value = p?.nome || '';
-  document.getElementById('prazo-descricao').value = p?.descricao || '';
-  openModal('modal-prazo');
-}
-function editPrazo(p) { openPrazoModal(p); }
-async function submitPrazo() {
-  const d = { nome: v('prazo-nome'), descricao: v('prazo-descricao') };
-  try {
-    if (S.editId) await req('PUT', '/prazos-pagamento/' + S.editId, d);
-    else await req('POST', '/prazos-pagamento', d);
-    closeModal('modal-prazo'); toast('Prazo de pagamento salvo!'); loadCadastros();
   } catch(e) { toast(e.message, 'err'); }
 }
 
@@ -1889,13 +1854,12 @@ function confirmDelete(type, id) {
     produto: 'Excluir este produto?',
     fornecedor: 'Excluir este fornecedor?',
     cliente: 'Excluir este cliente?',
-    embalagem: 'Excluir esta embalagem?',
-    prazo: 'Excluir este prazo de pagamento?'
+    embalagem: 'Excluir esta embalagem?'
   };
   document.getElementById('confirm-msg').textContent = msgs[type] || 'Confirmar exclusão?';
   document.getElementById('confirm-ok-btn').onclick = async () => {
     try {
-      const paths = { carregamento:'/carregamentos/', nota:'/notas-sf/', pedido:'/pedidos/', produto:'/produtos/', fornecedor:'/fornecedores/', cliente:'/clientes/', embalagem:'/embalagens/', prazo:'/prazos-pagamento/' };
+      const paths = { carregamento:'/carregamentos/', nota:'/notas-sf/', pedido:'/pedidos/', produto:'/produtos/', fornecedor:'/fornecedores/', cliente:'/clientes/', embalagem:'/embalagens/' };
       await req('DELETE', paths[type] + id);
       closeModal('confirm-modal'); toast('Excluído com sucesso!');
       const reloaders = {
@@ -1905,8 +1869,7 @@ function confirmDelete(type, id) {
         produto: loadCadastros,
         fornecedor: loadCadastros,
         cliente: loadCadastros,
-        embalagem: loadCadastros,
-        prazo: loadCadastros
+        embalagem: loadCadastros
       };
       reloaders[type]?.();
     } catch(e) { toast(e.message, 'err'); }
