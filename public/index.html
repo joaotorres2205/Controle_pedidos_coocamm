@@ -229,12 +229,6 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 .rel-stat .rv{font-size:1.28rem;font-weight:700;color:var(--green-d);line-height:1;letter-spacing:-.3px}
 .rel-stat.y .rv{color:var(--gold-d)}.rel-stat.b .rv{color:var(--blue)}
 
-/* Histórico */
-.acao-badge{display:inline-flex;align-items:center;padding:.18rem .55rem;border-radius:20px;font-size:.69rem;font-weight:700;letter-spacing:.2px}
-.acao-CRIOU{background:#ecfdf5;color:#059669;border:1px solid rgba(5,150,105,.15)}
-.acao-EDITOU{background:#fffbeb;color:#d97706;border:1px solid rgba(217,119,6,.15)}
-.acao-EXCLUIU{background:#fef2f2;color:#dc2626;border:1px solid rgba(220,38,38,.12)}
-
 /* Tabs */
 .tabs{display:flex;gap:.3rem;border-bottom:2px solid var(--border);margin-bottom:1.3rem}
 .tab{padding:.55rem 1.1rem;border-radius:8px 8px 0 0;font-size:.83rem;font-weight:600;color:var(--muted);background:none;border:none;cursor:pointer;transition:var(--transition)}
@@ -366,10 +360,6 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
     <a href="#" data-sec="relatorios">
       <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4zm2.5 2.1h-15V5h15v14.1zm0-16.1h-15c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
       Relatórios
-    </a>
-    <a href="#" data-sec="historico">
-      <svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
-      Histórico
     </a>
     <div class="sidebar-sub">Cadastros</div>
     <a href="#" data-sec="cadastros">
@@ -614,42 +604,6 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
           </table>
         </div>
       </div>
-    </section>
-
-    <!-- ── HISTÓRICO ──────────────────────────────────────────────── -->
-    <section id="sec-historico" hidden>
-      <div class="section-header">
-        <h2>Histórico de Ações</h2>
-        <div class="actions">
-          <button class="btn btn-secondary btn-sm" onclick="loadHistorico()">↻ Atualizar</button>
-        </div>
-      </div>
-      <div class="filter-bar" style="flex-wrap:wrap">
-        <select id="h-entidade" onchange="loadHistorico()">
-          <option value="">Todas as entidades</option>
-          <option value="carregamento">Carregamentos</option>
-          <option value="nota_sf">Notas SF</option>
-          <option value="pedido">Pedidos</option>
-          <option value="produto">Produtos</option>
-          <option value="fornecedor">Fornecedores</option>
-          <option value="cliente">Clientes</option>
-        </select>
-        <select id="h-acao" onchange="loadHistorico()">
-          <option value="">Todas as ações</option>
-          <option value="CRIOU">Criou</option>
-          <option value="EDITOU">Editou</option>
-          <option value="EXCLUIU">Excluiu</option>
-        </select>
-        <input type="date" id="h-data-ini" onchange="loadHistorico()">
-        <input type="date" id="h-data-fim" onchange="loadHistorico()">
-      </div>
-      <div class="tbl-wrap">
-        <table id="hist-tbl">
-          <thead><tr><th>Data / Hora</th><th>Usuário</th><th>Ação</th><th>Módulo</th><th>Descrição</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div id="hist-pag" style="display:flex;gap:.5rem;justify-content:center;margin-top:.8rem;flex-wrap:wrap"></div>
     </section>
 
     <!-- ── CADASTROS ─────────────────────────────────────────────── -->
@@ -929,7 +883,7 @@ function doLogout() {
 }
 
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
-const SECTIONS = { dashboard:'Dashboard', carregamentos:'Carregamentos', notas:'Notas SF', pedidos:'Pedidos', relatorios:'Relatórios', historico:'Histórico', cadastros:'Cadastros' };
+const SECTIONS = { dashboard:'Dashboard', carregamentos:'Carregamentos', notas:'Notas SF', pedidos:'Pedidos', relatorios:'Relatórios', cadastros:'Cadastros' };
 
 function navigate(sec) {
   Object.keys(SECTIONS).forEach(s => {
@@ -946,7 +900,6 @@ function navigate(sec) {
   if (sec === 'notas') loadNotas();
   if (sec === 'pedidos') loadPedidos();
   if (sec === 'relatorios') { initRelFiltros().then(() => gerarRelatorio()); }
-  if (sec === 'historico') loadHistorico();
   if (sec === 'cadastros') loadCadastros();
 }
 
@@ -1812,47 +1765,6 @@ function exportRelatorio() {
   a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
   a.download = filename; a.click();
 }
-
-// ─── HISTÓRICO ────────────────────────────────────────────────────────────────
-let histPage = 1;
-
-async function loadHistorico(page = 1) {
-  histPage = page;
-  const params = { page, limit: 50 };
-  const ent = v('h-entidade'), ac = v('h-acao'), ini = v('h-data-ini'), fim = v('h-data-fim');
-  if (ent) params.entidade = ent;
-  if (ac) params.acao = ac;
-  if (ini) params.data_ini = ini;
-  if (fim) params.data_fim = fim;
-  try {
-    const d = await req('GET', '/historico?' + new URLSearchParams(params));
-    renderHistorico(d);
-  } catch(e) { toast('Erro ao carregar histórico. Execute o schema_update_v2.sql no Supabase.', 'warn'); }
-}
-
-const ENTIDADE_LABELS = { carregamento:'Carregamento', nota_sf:'Nota SF', pedido:'Pedido', produto:'Produto', fornecedor:'Fornecedor', cliente:'Cliente' };
-
-function renderHistorico(d) {
-  const tb = document.querySelector('#hist-tbl tbody');
-  tb.innerHTML = (d.data||[]).length ? d.data.map(h => `<tr>
-    <td style="white-space:nowrap;font-size:.8rem">${fmtDatetime(h.created_at)}</td>
-    <td style="font-size:.8rem">${h.usuario_email||'—'}</td>
-    <td><span class="acao-badge acao-${h.acao}">${h.acao}</span></td>
-    <td style="font-size:.8rem">${ENTIDADE_LABELS[h.entidade]||h.entidade}</td>
-    <td style="font-size:.82rem">${h.descricao}</td>
-  </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum registro encontrado.</td></tr>`;
-
-  // Paginação
-  const total = d.total || 0, limit = d.limit || 50;
-  const pages = Math.ceil(total / limit);
-  const pag = document.getElementById('hist-pag');
-  if (pages <= 1) { pag.innerHTML = ''; return; }
-  pag.innerHTML = Array.from({length:Math.min(pages,10)},(_,i)=>i+1).map(p=>
-    `<button class="btn btn-sm ${p===histPage?'btn-primary':'btn-outline'}" onclick="loadHistorico(${p})">${p}</button>`
-  ).join('');
-}
-
-const fmtDatetime = dt => dt ? new Date(dt).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) : '—';
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 (async () => {

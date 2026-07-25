@@ -31,21 +31,6 @@ const requireAuth = async (req, res, next) => {
   next();
 };
 
-// ─── LOG DE HISTÓRICO ─────────────────────────────────────────────────────────
-async function logAction(userEmail, acao, entidade, entidadeId, descricao) {
-  try {
-    await supabase.from('historico').insert([{
-      usuario_email: userEmail || 'sistema',
-      acao, entidade,
-      entidade_id: entidadeId ? String(entidadeId) : null,
-      descricao
-    }]);
-  } catch (e) {
-    // Histórico não bloqueia operação principal
-    console.error('[LOG]', e.message);
-  }
-}
-
 // ─── BAIXA AUTOMÁTICA DE PEDIDOS ─────────────────────────────────────────────
 // delta > 0 = incrementa entregue | delta < 0 = estorna entregue
 async function atualizarPedidoBaixa(clienteId, produto, delta) {
@@ -75,25 +60,6 @@ app.post('/api/auth/login', async (req, res) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return res.status(401).json({ error: 'Email ou senha incorretos' });
   res.json({ token: data.session.access_token, user: { email: data.user.email, id: data.user.id } });
-});
-
-// ─── HISTÓRICO ────────────────────────────────────────────────────────────────
-app.get('/api/historico', requireAuth, async (req, res) => {
-  try {
-    const { entidade, acao, data_ini, data_fim, page = 1, limit = 50 } = req.query;
-    let q = supabase.from('historico').select('*', { count: 'exact' }).order('created_at', { ascending: false });
-    if (entidade) q = q.eq('entidade', entidade);
-    if (acao) q = q.eq('acao', acao);
-    if (data_ini) q = q.gte('created_at', data_ini + 'T00:00:00');
-    if (data_fim) q = q.lte('created_at', data_fim + 'T23:59:59');
-    const from = (parseInt(page) - 1) * parseInt(limit);
-    q = q.range(from, from + parseInt(limit) - 1);
-    const { data, error, count } = await q;
-    if (error) throw error;
-    res.json({ data: data || [], total: count || 0, page: parseInt(page), limit: parseInt(limit) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
 });
 
 // ─── RELATÓRIOS ──────────────────────────────────────────────────────────────
@@ -276,20 +242,17 @@ app.post('/api/produtos', requireAuth, async (req, res) => {
   if (!nome || !unidade) return res.status(400).json({ error: 'Nome e unidade são obrigatórios' });
   const { data, error } = await supabase.from('produtos').insert([{ nome: nome.toUpperCase(), unidade, descricao }]).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'CRIOU', 'produto', data.id, `Produto: ${data.nome}`);
   res.json(data);
 });
 app.put('/api/produtos/:id', requireAuth, async (req, res) => {
   const { nome, unidade, descricao } = req.body;
   const { data, error } = await supabase.from('produtos').update({ nome: nome.toUpperCase(), unidade, descricao }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'EDITOU', 'produto', data.id, `Produto: ${data.nome}`);
   res.json(data);
 });
 app.delete('/api/produtos/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('produtos').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'EXCLUIU', 'produto', req.params.id, `ID: ${req.params.id}`);
   res.json({ ok: true });
 });
 
@@ -304,20 +267,17 @@ app.post('/api/fornecedores', requireAuth, async (req, res) => {
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
   const { data, error } = await supabase.from('fornecedores').insert([{ nome, cnpj, telefone, email, cidade, estado }]).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'CRIOU', 'fornecedor', data.id, `Fornecedor: ${data.nome}`);
   res.json(data);
 });
 app.put('/api/fornecedores/:id', requireAuth, async (req, res) => {
   const { nome, cnpj, telefone, email, cidade, estado } = req.body;
   const { data, error } = await supabase.from('fornecedores').update({ nome, cnpj, telefone, email, cidade, estado }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'EDITOU', 'fornecedor', data.id, `Fornecedor: ${data.nome}`);
   res.json(data);
 });
 app.delete('/api/fornecedores/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('fornecedores').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'EXCLUIU', 'fornecedor', req.params.id, `ID: ${req.params.id}`);
   res.json({ ok: true });
 });
 
@@ -332,20 +292,17 @@ app.post('/api/clientes', requireAuth, async (req, res) => {
   if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
   const { data, error } = await supabase.from('clientes').insert([{ nome, cpf_cnpj, telefone, email, cidade, estado }]).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'CRIOU', 'cliente', data.id, `Cliente: ${data.nome}`);
   res.json(data);
 });
 app.put('/api/clientes/:id', requireAuth, async (req, res) => {
   const { nome, cpf_cnpj, telefone, email, cidade, estado } = req.body;
   const { data, error } = await supabase.from('clientes').update({ nome, cpf_cnpj, telefone, email, cidade, estado }).eq('id', req.params.id).select().single();
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'EDITOU', 'cliente', data.id, `Cliente: ${data.nome}`);
   res.json(data);
 });
 app.delete('/api/clientes/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('clientes').delete().eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
-  logAction(req.user.email, 'EXCLUIU', 'cliente', req.params.id, `ID: ${req.params.id}`);
   res.json({ ok: true });
 });
 
@@ -376,7 +333,6 @@ app.post('/api/carregamentos', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Campos obrigatórios: Nota NF, Data, Produto, Modal, Quantidade, Custo' });
     const { data: result, error } = await supabase.from('carregamentos').insert([{ nota_nf, data, produto, modal, quantidade:parseFloat(quantidade), custo_ton:parseFloat(custo_ton), serie_filial, fornecedor_id:fornecedor_id||null }]).select().single();
     if (error) throw error;
-    logAction(req.user.email, 'CRIOU', 'carregamento', result.id, `NF ${nota_nf} — ${produto} — ${quantidade}t`);
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -386,7 +342,6 @@ app.put('/api/carregamentos/:id', requireAuth, async (req, res) => {
     const { nota_nf, data, produto, modal, quantidade, custo_ton, serie_filial, fornecedor_id } = req.body;
     const { data: result, error } = await supabase.from('carregamentos').update({ nota_nf, data, produto, modal, quantidade:parseFloat(quantidade), custo_ton:parseFloat(custo_ton), serie_filial, fornecedor_id:fornecedor_id||null }).eq('id', req.params.id).select().single();
     if (error) throw error;
-    logAction(req.user.email, 'EDITOU', 'carregamento', result.id, `NF ${nota_nf} — ${produto}`);
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -395,7 +350,6 @@ app.delete('/api/carregamentos/:id', requireAuth, async (req, res) => {
   try {
     const { error } = await supabase.from('carregamentos').delete().eq('id', req.params.id);
     if (error) throw error;
-    logAction(req.user.email, 'EXCLUIU', 'carregamento', req.params.id, `ID: ${req.params.id}`);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -434,7 +388,6 @@ app.post('/api/notas-sf', requireAuth, async (req, res) => {
     // Baixa automática no pedido
     await atualizarPedidoBaixa(cliente_id, produto, parseFloat(quantidade));
 
-    logAction(req.user.email, 'CRIOU', 'nota_sf', result.id, `SF ${nota_sf} — ${result.clientes?.nome||cliente_id} — ${quantidade}t`);
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -465,7 +418,6 @@ app.put('/api/notas-sf/:id', requireAuth, async (req, res) => {
     await atualizarPedidoBaixa(antiga.cliente_id, antiga.produto, -parseFloat(antiga.quantidade));
     await atualizarPedidoBaixa(cliente_id, produto, parseFloat(quantidade));
 
-    logAction(req.user.email, 'EDITOU', 'nota_sf', result.id, `SF ${nota_sf} — ${result.clientes?.nome||cliente_id} — ${quantidade}t`);
     res.json(result);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -479,7 +431,6 @@ app.delete('/api/notas-sf/:id', requireAuth, async (req, res) => {
     // Estorna a baixa do pedido
     if (nota) await atualizarPedidoBaixa(nota.cliente_id, nota.produto, -parseFloat(nota.quantidade||0));
 
-    logAction(req.user.email, 'EXCLUIU', 'nota_sf', req.params.id, `SF ${nota?.nota_sf||req.params.id} — ${nota?.quantidade||'?'}t`);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -499,7 +450,6 @@ app.post('/api/pedidos', requireAuth, async (req, res) => {
     if (!cliente_id||!quantidade_pedida) return res.status(400).json({ error: 'Cliente e quantidade pedida são obrigatórios' });
     const { data, error } = await supabase.from('pedidos').insert([{ cliente_id, produto: produto?.toUpperCase(), quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }]).select('*, clientes(nome)').single();
     if (error) throw error;
-    logAction(req.user.email, 'CRIOU', 'pedido', data.id, `Pedido ${data.clientes?.nome||cliente_id} — ${quantidade_pedida}t`);
     res.json(data);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -509,7 +459,6 @@ app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
     const { cliente_id, produto, quantidade_pedida, quantidade_entregue, observacao } = req.body;
     const { data, error } = await supabase.from('pedidos').update({ cliente_id, produto: produto?.toUpperCase(), quantidade_pedida:parseFloat(quantidade_pedida), quantidade_entregue:parseFloat(quantidade_entregue||0), observacao }).eq('id', req.params.id).select('*, clientes(nome)').single();
     if (error) throw error;
-    logAction(req.user.email, 'EDITOU', 'pedido', data.id, `Pedido ${data.clientes?.nome||cliente_id} — Entregue: ${quantidade_entregue}t`);
     res.json(data);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -518,7 +467,6 @@ app.delete('/api/pedidos/:id', requireAuth, async (req, res) => {
   try {
     const { error } = await supabase.from('pedidos').delete().eq('id', req.params.id);
     if (error) throw error;
-    logAction(req.user.email, 'EXCLUIU', 'pedido', req.params.id, `ID: ${req.params.id}`);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
