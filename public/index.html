@@ -33,6 +33,9 @@ input,select,textarea{font-family:inherit;font-size:.9rem}
 @keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
 @keyframes slideInR{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 @keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes sectionEnter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes toastBar{from{width:100%}to{width:0}}
 
 /* ─── LOGIN ─────────────────────────────────────────────────────────── */
 #login-screen{min-height:100vh;display:flex;background:#fff}
@@ -117,7 +120,7 @@ footer{text-align:center;padding:.7rem;font-size:.72rem;color:var(--muted);borde
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:90;backdrop-filter:blur(2px)}
 
 /* ─── SECTION ANIMATION ──────────────────────────────────────────────── */
-section{animation:fadeUp .3s ease both}
+section{animation:sectionEnter .25s cubic-bezier(.4,0,.2,1) both}
 
 /* ─── COMMON COMPONENTS ──────────────────────────────────────────────── */
 .section-header{display:flex;align-items:center;gap:.8rem;margin-bottom:1.4rem;flex-wrap:wrap}
@@ -155,7 +158,6 @@ tbody tr:nth-child(even){background:#fafcfa}
 tbody tr:hover{background:var(--green-xl)}
 tbody tr:last-child{border-bottom:none}
 tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
-.tbl-empty{text-align:center;padding:3rem 1rem;color:var(--muted);font-size:.88rem}
 
 /* Badges */
 .badge{display:inline-flex;align-items:center;padding:.22rem .65rem;border-radius:20px;font-size:.69rem;font-weight:700;white-space:nowrap;letter-spacing:.2px}
@@ -205,11 +207,14 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 .field input,.field select,.field textarea{width:100%;padding:.65rem .9rem;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:.9rem;transition:var(--transition);background:#fff;color:var(--text)}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(26,92,56,.09)}
 .field .hint{font-size:.71rem;color:var(--green-l);margin-top:.3rem;font-weight:500}
+.field input.error,.field select.error{border-color:var(--red)!important;box-shadow:0 0 0 3px rgba(220,38,38,.1)!important}
+.field .error-msg{font-size:.71rem;color:var(--red);margin-top:.3rem;font-weight:500;display:none}
+.field input.error + .error-msg,.field select.error + .error-msg{display:block}
 .modal-foot{padding:1rem 1.5rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.6rem;position:sticky;bottom:0;background:var(--card);border-radius:0 0 16px 16px}
 
 /* Toast */
 #toast-wrap{position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;display:flex;flex-direction:column;gap:.5rem}
-.toast{padding:.75rem 1.2rem;border-radius:10px;font-size:.83rem;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.14);animation:slideInR .25s ease;display:flex;align-items:center;gap:.6rem;max-width:340px}
+.toast{position:relative;padding:.75rem 1.2rem;border-radius:10px;font-size:.83rem;font-weight:500;box-shadow:0 4px 20px rgba(0,0,0,.14);animation:slideInR .25s ease;display:flex;align-items:center;gap:.6rem;max-width:340px;overflow:hidden}
 .toast.ok{background:rgba(16,185,129,.95);color:#fff}
 .toast.err{background:rgba(220,38,38,.95);color:#fff}
 .toast.warn{background:rgba(234,179,8,.95);color:#1a1a00}
@@ -283,7 +288,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 .saldo-run{font-weight:700;color:var(--green-d)}
 .saldo-run.zero{color:var(--muted);font-weight:400}
 /* Mobile */
-@media(max-width:700px){
+@media(max-width:768px){
   #sidebar{transform:translateX(-100%)}
   #sidebar.open{transform:none}
   #main{margin-left:0}
@@ -1019,15 +1024,18 @@ function doLogout() {
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 const SECTIONS = { dashboard:'Dashboard', carregamentos:'Carregamentos', notas:'Notas SF', pedidos:'Pedidos', relatorios:'Relatórios', cadastros:'Cadastros', usuarios:'Usuários' };
 
-function navigate(sec) {
-  Object.keys(SECTIONS).forEach(s => {
-    const el = document.getElementById('sec-' + s);
-    if (el) el.hidden = s !== sec;
-    document.querySelectorAll('#sidebar nav a').forEach(a => {
-      a.classList.toggle('active', a.dataset.sec === sec);
-    });
+async function navigate(sec) {
+  document.querySelectorAll('#content section').forEach(s => s.hidden = true);
+  await new Promise(r => setTimeout(r, 40)); // deixa o navegador respirar
+  const secEl = document.getElementById('sec-' + sec);
+  if (secEl) secEl.hidden = false;
+  document.querySelectorAll('#sidebar nav a').forEach(a => {
+    a.classList.toggle('active', a.dataset.sec === sec);
   });
-  document.getElementById('page-title').textContent = SECTIONS[sec] || sec;
+  document.getElementById('page-title').innerHTML =
+    `<span style="color:var(--muted);font-weight:400">COOCAMM</span>
+     <span style="color:var(--border);margin:0 .4rem">›</span>
+     ${SECTIONS[sec] || sec}`;
   closeSidebar();
   if (sec === 'dashboard') loadDashboard();
   if (sec === 'carregamentos') loadCarregamentos();
@@ -1102,7 +1110,7 @@ async function loadDashboard() {
       <td>${n.nota_sf}</td><td>${fmtDate(n.data)}</td><td>${n.produto}</td>
       <td>${n.cliente_nome || n.clientes?.nome || '—'}</td>
       <td>${fmt(n.quantidade)}</td><td>${fmtMoney(n.valor_total)}</td>
-    </tr>`).join('') || `<tr><td colspan="6" class="tbl-empty">Nenhuma nota lançada.</td></tr>`;
+    </tr>`).join('') || emptyState('Nenhuma nota SF lançada ainda');
   } catch(e) { toast('Erro no dashboard: ' + e.message, 'err'); }
 }
 
@@ -1117,6 +1125,7 @@ async function loadCarregamentos() {
   if (p) params.produto = p;
   if (m) params.modal = m;
   if (f) params.fornecedor_id = f;
+  skeletonRows(document.querySelector('#carr-tbl tbody'), 11);
   try {
     S.carregamentos = await req('GET', '/carregamentos?' + new URLSearchParams(params));
     renderCarregamentos();
@@ -1126,7 +1135,7 @@ async function loadCarregamentos() {
 function renderCarregamentos() {
   const tb = document.querySelector('#carr-tbl tbody');
   if (!S.carregamentos.length) {
-    tb.innerHTML = `<tr><td colspan="11" class="tbl-empty">Nenhum carregamento encontrado.</td></tr>`;
+    tb.innerHTML = emptyState('Nenhum carregamento registrado', '+ Lançar Nota Mãe', 'openCarrModal()');
     return;
   }
 
@@ -1156,6 +1165,8 @@ function renderCarregamentos() {
       const badgeSt = c.status === 'Encerrado' ? 'badge-closed' : c.status === 'Quase enc.' ? 'badge-almost' : 'badge-open';
       const sfs = (c.notas_sf || []).sort((a,b) => new Date(a.data) - new Date(b.data));
       const sfCount = sfs.length;
+      const pct = Math.min(100, c.quantidade > 0 ? (c.faturado / c.quantidade) * 100 : 0);
+      const cor = pct >= 100 ? 'done' : pct >= 80 ? 'warn' : '';
 
       // ── LINHA AZUL: nota mãe / NF do fornecedor (carregamento) ──────────
       html += `<tr class="carr-parent" onclick="toggleCarr('sf-${c.id}')">
@@ -1170,7 +1181,13 @@ function renderCarregamentos() {
         <td><span class="badge badge-${(c.modal||'').toLowerCase()}">${c.modal}</span></td>
         <td><strong>${fmt(c.quantidade)}</strong></td>
         <td>${fmt(c.faturado)}</td>
-        <td><span class="saldo-run ${c.saldo<=0?'zero':''}">${fmt(c.saldo)}</span></td>
+        <td style="min-width:90px">
+          <span class="saldo-run ${c.saldo<=0?'zero':''}">${fmt(c.saldo)}</span>
+          <div class="prog" style="margin-top:4px">
+            <div class="prog-fill ${cor}" style="width:${pct}%"></div>
+          </div>
+          <div style="font-size:.64rem;color:var(--muted);margin-top:2px">${pct.toFixed(0)}% faturado</div>
+        </td>
         <td>${fmtMoney(c.custo_ton)}</td>
         <td><span class="badge ${badgeSt}">${c.status}</span></td>
         <td onclick="event.stopPropagation()">
@@ -1259,6 +1276,10 @@ function editCarr(c) { openCarrModal(c); }
 
 async function submitCarr() {
   return withLoading('submitCarr', async () => {
+    if (!v('c-nota_nf')) return setFieldError('c-nota_nf', 'Nota NF é obrigatória');
+    if (!v('c-data')) return setFieldError('c-data', 'Data é obrigatória');
+    if (!v('c-produto')) return setFieldError('c-produto', 'Selecione um produto');
+    if (!v('c-custo_ton')) return setFieldError('c-custo_ton', 'Custo é obrigatório');
     const qtde = parseFloat(v('c-quantidade'));
     if (!qtde || qtde <= 0) return toast('Quantidade deve ser maior que zero', 'err');
     const d = {
@@ -1282,6 +1303,7 @@ async function loadNotas() {
   const cli = document.getElementById('f-nota-cli')?.value;
   if (p) params.produto = p;
   if (cli) params.cliente = cli;
+  skeletonRows(document.querySelector('#nota-tbl tbody'), 8);
   try {
     S.notas = await req('GET', '/notas-sf?' + new URLSearchParams(params));
     renderNotas();
@@ -1290,7 +1312,7 @@ async function loadNotas() {
 
 function renderNotas() {
   const tb = document.querySelector('#nota-tbl tbody');
-  if (!S.notas.length) { tb.innerHTML = `<tr><td colspan="8" class="tbl-empty">Nenhuma nota encontrada.</td></tr>`; return; }
+  if (!S.notas.length) { tb.innerHTML = emptyState('Nenhuma nota SF registrada', '+ Lançar Saída', 'openNotaModal()'); return; }
   tb.innerHTML = S.notas.map(n => `<tr>
     <td><strong>${n.nota_sf}</strong></td>
     <td>${fmtDate(n.data)}</td>
@@ -1381,6 +1403,12 @@ function updateSaldoHint() {
 
 async function submitNota() {
   return withLoading('submitNota', async () => {
+    if (!v('n-nota_sf')) return setFieldError('n-nota_sf', 'Nota SF é obrigatória');
+    if (!v('n-data')) return setFieldError('n-data', 'Data é obrigatória');
+    if (!v('n-produto')) return setFieldError('n-produto', 'Selecione um produto');
+    if (!v('n-carregamento_id')) return setFieldError('n-carregamento_id', 'Selecione um carregamento');
+    if (!v('n-cliente_id')) return setFieldError('n-cliente_search', 'Selecione um cliente');
+    if (!v('n-valor_total')) return setFieldError('n-valor_total', 'Valor total é obrigatório');
     const qtde = parseFloat(v('n-quantidade'));
     if (!qtde || qtde <= 0) return toast('Quantidade deve ser maior que zero', 'err');
     const d = {
@@ -1448,6 +1476,7 @@ function restaurarFiltroPedidos() {
 }
 
 async function loadPedidos() {
+  skeletonRows(document.querySelector('#pedido-tbl tbody'), 8);
   try {
     if (!S.pedidos.length) restaurarFiltroPedidos();
     const todos = await req('GET', '/pedidos');
@@ -1459,7 +1488,7 @@ async function loadPedidos() {
 
 function renderPedidos() {
   const tb = document.querySelector('#pedido-tbl tbody');
-  if (!S.pedidos.length) { tb.innerHTML = `<tr><td colspan="8" class="tbl-empty">Nenhum pedido cadastrado.</td></tr>`; return; }
+  if (!S.pedidos.length) { tb.innerHTML = emptyState('Nenhum pedido cadastrado', '+ Novo Pedido', 'openPedidoModal()'); return; }
 
   let html = '';
   S.pedidos.forEach((ped, idx) => {
@@ -1672,6 +1701,10 @@ function deletePedidoGrupo(numero_pedido, ids) {
 
 // ─── CADASTROS ────────────────────────────────────────────────────────────────
 async function loadCadastros() {
+  skeletonRows(document.querySelector('#prod-tbl tbody'), 4);
+  skeletonRows(document.querySelector('#forn-tbl tbody'), 5);
+  skeletonRows(document.querySelector('#cli-tbl tbody'), 5);
+  skeletonRows(document.querySelector('#emb-tbl tbody'), 3);
   try {
     [S.produtos, S.fornecedores, S.clientes, S.embalagens] = await Promise.all([
       req('GET', '/produtos'), req('GET', '/fornecedores'), req('GET', '/clientes'),
@@ -1689,7 +1722,7 @@ function renderProd() {
       <button class="btn btn-secondary btn-sm" onclick='editProd(${JSON.stringify(p)})'>✎</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDelete("produto","${p.id}")'>🗑</button>
     </td>
-  </tr>`).join('') : `<tr><td colspan="4" class="tbl-empty">Nenhum produto cadastrado.</td></tr>`;
+  </tr>`).join('') : emptyState('Nenhum registro encontrado', '+ Adicionar', 'openProdModal()');
 }
 
 function renderForn() {
@@ -1701,7 +1734,7 @@ function renderForn() {
       <button class="btn btn-secondary btn-sm" onclick='editForn(${JSON.stringify(f)})'>✎</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDelete("fornecedor","${f.id}")'>🗑</button>
     </td>
-  </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum fornecedor cadastrado.</td></tr>`;
+  </tr>`).join('') : emptyState('Nenhum registro encontrado', '+ Adicionar', 'openFornModal()');
 }
 
 function renderCli() {
@@ -1713,7 +1746,7 @@ function renderCli() {
       <button class="btn btn-secondary btn-sm" onclick='editCli(${JSON.stringify(c)})'>✎</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDelete("cliente","${c.id}")'>🗑</button>
     </td>
-  </tr>`).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum cliente cadastrado.</td></tr>`;
+  </tr>`).join('') : emptyState('Nenhum registro encontrado', '+ Adicionar', 'openCliModal()');
 }
 
 function renderEmb() {
@@ -1724,7 +1757,7 @@ function renderEmb() {
       <button class="btn btn-secondary btn-sm" onclick='editEmb(${JSON.stringify(e)})'>✎</button>
       <button class="btn btn-danger btn-sm" onclick='confirmDelete("embalagem","${e.id}")'>🗑</button>
     </td>
-  </tr>`).join('') : `<tr><td colspan="3" class="tbl-empty">Nenhuma embalagem cadastrada.</td></tr>`;
+  </tr>`).join('') : emptyState('Nenhum registro encontrado', '+ Adicionar', 'openEmbModal()');
 }
 
 const CADASTRO_TABS = ['produtos','fornecedores','clientes','embalagens'];
@@ -1820,6 +1853,7 @@ async function submitCli() {
 
 // ─── USUÁRIOS ─────────────────────────────────────────────────────────────────
 async function loadUsuarios() {
+  skeletonRows(document.querySelector('#usr-tbl tbody'), 5);
   try {
     const users = await req('GET', '/usuarios');
     const tb = document.querySelector('#usr-tbl tbody');
@@ -1835,7 +1869,7 @@ async function loadUsuarios() {
           ${u.id!==me?`<button class="btn btn-danger btn-sm" onclick='confirmDeleteUsuario("${u.id}","${u.email}")'>🗑</button>`:''}
         </td>
       </tr>`).join('')
-    : '<tr><td colspan="5" class="tbl-empty">Nenhum usuário encontrado.</td></tr>';
+    : emptyState('Nenhum usuário encontrado', '+ Novo Usuário', 'openUsuarioModal()');
   } catch(e) { toast('Erro ao carregar usuários: '+e.message,'err'); }
 }
 
@@ -2014,11 +2048,47 @@ function createSearchSelect(inputId, hiddenId, items, labelKey, valueKey) {
 
 function toast(msg, type = 'ok') {
   const icons = { ok: '✓', err: '✗', warn: '⚠' };
+  const dur = type === 'err' ? 5000 : type === 'warn' ? 4000 : 2800;
   const el = document.createElement('div');
   el.className = `toast ${type}`;
-  el.innerHTML = `<span>${icons[type]||'i'}</span> <span>${msg}</span>`;
+  el.innerHTML = `<span>${icons[type]||'i'}</span> <span>${msg}</span>
+    <div style="position:absolute;bottom:0;left:0;height:3px;background:rgba(255,255,255,.4);border-radius:0 0 10px 10px;animation:toastBar ${dur}ms linear forwards"></div>`;
   document.getElementById('toast-wrap').appendChild(el);
-  setTimeout(() => el.remove(), type === 'err' ? 5000 : 3000);
+  setTimeout(() => el.remove(), dur);
+}
+
+// ─── SKELETON LOADERS / EMPTY STATES / VALIDAÇÃO VISUAL ───────────────────────
+function skeletonRows(tbody, cols = 5, rows = 5) {
+  if (!tbody) return;
+  tbody.innerHTML = Array(rows).fill(`<tr>${Array(cols).fill(`
+    <td><div style="height:14px;border-radius:6px;background:linear-gradient(90deg,#e8f0e8 25%,#f0f5f0 50%,#e8f0e8 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;"></div></td>
+  `).join('')}</tr>`).join('');
+}
+
+function emptyState(mensagem, btnLabel = null, btnAction = null) {
+  return `<tr><td colspan="99">
+    <div style="text-align:center;padding:3.5rem 1rem;color:var(--muted)">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:.3;margin-bottom:1rem">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+      </svg>
+      <div style="font-size:.92rem;font-weight:600;color:var(--green-d);margin-bottom:.3rem">${mensagem}</div>
+      ${btnLabel ? `<button class="btn btn-primary btn-sm" style="margin-top:.9rem" onclick="${btnAction}">${btnLabel}</button>` : ''}
+    </div>
+  </td></tr>`;
+}
+
+function setFieldError(inputId, msg) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  el.classList.add('error');
+  let err = el.nextElementSibling;
+  if (!err || !err.classList.contains('error-msg')) {
+    err = document.createElement('div');
+    err.className = 'error-msg';
+    el.after(err);
+  }
+  err.textContent = msg;
+  el.addEventListener('input', () => { el.classList.remove('error'); err.textContent = ''; }, { once: true });
 }
 
 // Evita duplo envio: desabilita o botão "Salvar" enquanto a ação estiver em andamento
@@ -2158,7 +2228,7 @@ function renderRelProduto() {
       <td><div style="display:flex;align-items:center;gap:.4rem"><div class="prog" style="min-width:50px"><div class="prog-fill" style="width:${pct}%"></div></div>${pct}%</div></td>
       <td>${fmtMoney(r.valor)}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="6" class="tbl-empty">Nenhum dado. Clique em "Gerar Relatório".</td></tr>`;
+  }).join('') : emptyState('Nenhum dado — clique em "Gerar Relatório"');
 }
 
 function renderRelClientes() {
@@ -2168,7 +2238,7 @@ function renderRelClientes() {
   tb.innerHTML = clientes.length ? clientes.map(([nome, r]) => {
     const media = r.faturado > 0 ? r.valor/r.faturado : 0;
     return `<tr><td><strong>${nome}</strong></td><td>${fmt(r.faturado)}</td><td>${fmtMoney(r.valor)}</td><td>${r.notas}</td><td>${fmtMoney(media)}</td></tr>`;
-  }).join('') : `<tr><td colspan="5" class="tbl-empty">Nenhum dado.</td></tr>`;
+  }).join('') : emptyState('Nenhum dado no período selecionado');
 }
 
 function renderRelMensal() {
@@ -2191,7 +2261,7 @@ function renderRelMensal() {
     const r = d[m], med = r.faturado>0?r.valor/r.faturado:0;
     const [y,mo]=m.split('-');
     return `<tr><td>${mo}/${y}</td><td>${fmt(r.faturado)}</td><td>${fmtMoney(r.valor)}</td><td>${fmtMoney(med)}</td></tr>`;
-  }).join('') : `<tr><td colspan="4" class="tbl-empty">Nenhum dado.</td></tr>`;
+  }).join('') : emptyState('Nenhum dado no período selecionado');
 }
 
 function renderRelCarregamentos() {
@@ -2201,7 +2271,7 @@ function renderRelCarregamentos() {
     <td>${c.fornecedor_nome}</td><td><span class="badge badge-${(c.modal||'').toLowerCase()}">${c.modal}</span></td>
     <td>${fmt(c.quantidade)}</td><td>${fmt(c.faturado)}</td><td>${fmt(c.saldo)}</td>
     <td>${c.pct_faturado}%</td><td>${fmtMoney(c.custo_ton)}</td><td>${fmtMoney(c.valor_carregamento)}</td>
-  </tr>`).join('') : `<tr><td colspan="11" class="tbl-empty">Nenhum carregamento no período.</td></tr>`;
+  </tr>`).join('') : emptyState('Nenhum carregamento no período selecionado');
 }
 
 function renderRelNotas() {
@@ -2212,7 +2282,7 @@ function renderRelNotas() {
     <td><span class="badge badge-${(n.carr_modal||'').toLowerCase()}">${n.carr_modal||'—'}</span></td>
     <td>${n.carr_fornecedor}</td><td>${fmt(n.quantidade)}</td>
     <td>${fmtMoney(n.valor_total)}</td><td>${fmtMoney(n.preco_ton)}</td>
-  </tr>`).join('') : `<tr><td colspan="10" class="tbl-empty">Nenhuma nota no período.</td></tr>`;
+  </tr>`).join('') : emptyState('Nenhuma nota SF no período selecionado');
 }
 
 function switchRelTab(t) {
