@@ -111,18 +111,33 @@ async function atualizarPedidoBaixa(clienteId, produto, delta) {
   try {
     const { data: pedido } = await supabase
       .from('pedidos')
-      .select('id, quantidade_entregue')
+      .select('id, quantidade_entregue, quantidade_pedida')
       .eq('cliente_id', clienteId)
       .eq('produto', produto.toUpperCase())
       .eq('status', 'aberto')
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
-    if (!pedido) return; // nenhum pedido para este cliente+produto
+    if (!pedido) return; // nenhum pedido aberto para este cliente+produto
 
     const novaEntregue = Math.max(0, parseFloat(pedido.quantidade_entregue || 0) + delta);
+    const qtdePedida = parseFloat(pedido.quantidade_pedida || 0);
+
+    // Auto-encerra o item quando entrega atingir ou ultrapassar 100%
+    const autoEncerrar = qtdePedida > 0 && novaEntregue >= qtdePedida;
+
     await supabase.from('pedidos')
-      .update({ quantidade_entregue: novaEntregue, updated_at: new Date().toISOString() })
+      .update({
+        quantidade_entregue: novaEntregue,
+        updated_at: new Date().toISOString(),
+        ...(autoEncerrar ? { status: 'encerrado' } : {})
+      })
       .eq('id', pedido.id);
+
+    if (autoEncerrar) {
+      console.log(`[AUTO-ENCERRAR] Pedido item ${pedido.id} atingiu 100% (${novaEntregue}/${qtdePedida}) — encerrado automaticamente`);
+    }
   } catch (e) {
     console.error('[BAIXA PEDIDO]', e.message);
   }
@@ -632,7 +647,9 @@ app.get('/api/pedidos', requireAuth, async (req, res) => {
       const chave = p.numero_pedido || p.id;
       if (!grupos[chave]) {
         grupos[chave] = {
-          numero_pedido: p.numero_pedido, cliente_id: p.cliente_id,
+          // Fallback para o id quando numero_pedido é NULL (pedidos antigos) — garante que o
+          // frontend sempre tenha um identificador válido para encerrar/excluir o pedido.
+          numero_pedido: chave, cliente_id: p.cliente_id,
           cliente_nome: p.clientes?.nome || '—', observacao: p.observacao,
           created_at: p.created_at, itens: [], _statuses: []
         };
@@ -737,11 +754,26 @@ app.put('/api/pedidos/:id', requireAuth, async (req, res) => {
 // Encerra todos os itens de um pedido (mesmo numero_pedido) — saldo restante fica finalizado
 app.post('/api/pedidos/:numero_pedido/encerrar', requireAuth, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('pedidos')
-      .update({ status: 'encerrado', updated_at: new Date().toISOString() })
-      .eq('numero_pedido', req.params.numero_pedido)
+    const np = req.params.numero_pedido;
+    const agora = new Date().toISOString();
+
+    // Tenta encerrar pelo numero_pedido (pedidos novos)
+    let { data, error } = await supabase.from('pedidos')
+      .update({ status: 'encerrado', updated_at: agora })
+      .eq('numero_pedido', np)
       .select();
     if (error) throw error;
+
+    // Fallback: pedidos antigos com numero_pedido NULL — chave no frontend é o próprio id
+    if (!data || !data.length) {
+      const { data: d2, error: e2 } = await supabase.from('pedidos')
+        .update({ status: 'encerrado', updated_at: agora })
+        .eq('id', np)
+        .select();
+      if (e2) throw e2;
+      data = d2 || [];
+    }
+
     if (!data.length) return res.status(404).json({ error: 'Pedido não encontrado' });
     res.json({ ok: true });
   } catch (e) { return safeError(e, res); }
