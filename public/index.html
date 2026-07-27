@@ -1477,11 +1477,11 @@ function restaurarFiltroPedidos() {
 }
 
 async function loadPedidos() {
+  restaurarFiltroPedidos();
   skeletonRows(document.querySelector('#pedido-tbl tbody'), 8);
   try {
-    if (!S.pedidos.length) restaurarFiltroPedidos();
     const todos = await req('GET', '/pedidos');
-    const mostrarEncerrados = document.getElementById('f-ped-encerrados')?.checked;
+    const mostrarEncerrados = localStorage.getItem('coocamm_ped_encerrados') === '1';
     S.pedidos = mostrarEncerrados ? todos : todos.filter(p => p.status !== 'encerrado');
     renderPedidos();
   } catch(e) { toast('Erro: ' + e.message, 'err'); }
