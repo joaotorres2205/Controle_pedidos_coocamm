@@ -960,6 +960,7 @@ tbody td{padding:.65rem 1rem;font-size:.84rem;vertical-align:middle}
 <!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
 <script>
 // ─── STATE ──────────────────────────────────────────────────────────────────
+let _piRowId = 0; // contador para gerar ids únicos nas linhas de item do pedido
 const S = {
   token: localStorage.getItem('ibiata_token'),
   user: null,
@@ -1561,16 +1562,17 @@ function togglePed(id) {
 }
 
 function pedidoItemRowHtml(produto = '', qtde = '', embalagem_id = '', preco = '', dataPagamento = '') {
-  const prodOptions = '<option value="">— Produto —</option>' + S.produtos.map(p =>
-    `<option value="${p.nome}"${p.nome === produto ? ' selected' : ''}>${p.nome}</option>`
-  ).join('');
+  const rowId = ++_piRowId;
   const embOptions = '<option value="">Embalagem</option>' + S.embalagens.map(e =>
     `<option value="${e.id}"${e.id === embalagem_id ? ' selected' : ''}>${e.nome}</option>`
   ).join('');
   const totalInicial = qtde && preco ? fmtMoney(parseFloat(qtde) * parseFloat(preco)) : '';
-  return `<div class="pedido-item-row" data-row>
+  return `<div class="pedido-item-row" data-row data-rowid="${rowId}">
     <button type="button" class="btn btn-danger btn-sm pi-remove-btn" onclick="removePedidoItemRow(this)">✕</button>
-    <select class="pi-produto">${prodOptions}</select>
+    <div class="search-select">
+      <input id="pi-produto-search-${rowId}" class="pi-produto-search" autocomplete="off" placeholder="Buscar produto...">
+      <input type="hidden" id="pi-produto-hidden-${rowId}" class="pi-produto" value="${produto}">
+    </div>
     <div class="pi-grid2">
       <input class="pi-qtde" type="number" step="0.01" placeholder="Qtde (t)" value="${qtde}" oninput="calcItemTotal(this)">
       <select class="pi-embalagem">${embOptions}</select>
@@ -1596,6 +1598,17 @@ function calcItemTotal(el) {
 function addPedidoItemRow(produto = '', qtde = '', embalagem_id = '', preco = '', dataPagamento = '') {
   document.getElementById('p-itens').insertAdjacentHTML('beforeend', pedidoItemRowHtml(produto, qtde, embalagem_id, preco, dataPagamento));
   updatePedidoRemoveButtons();
+  const lastRow = document.querySelector('#p-itens [data-row]:last-of-type');
+  if (lastRow) {
+    const rowId = lastRow.dataset.rowid;
+    createSearchSelect(
+      'pi-produto-search-' + rowId,
+      'pi-produto-hidden-' + rowId,
+      S.produtos,
+      'nome',
+      'nome'   // produto é armazenado pelo nome, não por id
+    );
+  }
 }
 
 function removePedidoItemRow(btn) {
